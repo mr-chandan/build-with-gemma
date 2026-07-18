@@ -25,7 +25,9 @@ export type RunInput = {
 };
 
 export async function* runAgent(input: RunInput): AsyncGenerator<AgentEvent> {
-  const instruction = buildToolInstruction(SYSTEM_PROMPT, TOOLS);
+  const today = new Date().toISOString().slice(0, 10);
+  const datedPrompt = `${SYSTEM_PROMPT}\n\nToday's date is ${today}. Resolve relative dates (e.g. "next month", "end of September") against it, and always use the current year unless the user says otherwise.`;
+  const instruction = buildToolInstruction(datedPrompt, TOOLS);
   const history: ChatMessage[] = [...input.messages];
 
   // If resuming from an approved confirmation, execute it before the next model turn.

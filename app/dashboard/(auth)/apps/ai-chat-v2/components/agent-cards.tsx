@@ -1,6 +1,16 @@
 "use client";
 
-import { CheckIcon, XIcon, FileTextIcon, UserPlusIcon, ReceiptIndianRupeeIcon, AlertTriangleIcon } from "lucide-react";
+import {
+  CheckIcon,
+  XIcon,
+  FileTextIcon,
+  UserPlusIcon,
+  ReceiptIndianRupeeIcon,
+  AlertTriangleIcon,
+  MailCheckIcon,
+  BellIcon,
+  CalendarClockIcon,
+} from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,8 +43,17 @@ function clientName(row: Row): string {
   return c?.company || c?.name || "—";
 }
 
-/** Renders a tool result as a rich card, switching on the tool name. */
-export function ToolResultCard({ name, result }: { name: string; result: unknown }) {
+/** Renders a tool result as a rich card, switching on the tool name.
+ *  `onAction` lets a card trigger a follow-up chat message (e.g. "Send reminder"). */
+export function ToolResultCard({
+  name,
+  result,
+  onAction,
+}: {
+  name: string;
+  result: unknown;
+  onAction?: (prompt: string) => void;
+}) {
   const data = (result ?? {}) as Row;
 
   if (data.error) {
@@ -106,16 +125,59 @@ export function ToolResultCard({ name, result }: { name: string; result: unknown
     );
   }
 
+  if (name === "send_invoice_reminder") {
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+          <MailCheckIcon className="size-4 text-emerald-600" />
+          <CardTitle className="text-sm">Reminder sent — {String(data.invoice_number)}</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <div className="text-muted-foreground">
+            Emailed <span className="text-foreground">{String(data.sent_to)}</span> for{" "}
+            {inr(data.amount as number)}
+            {data.overdue ? " (overdue)" : ""}.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (name === "list_deadlines") {
+    const rows = (data.deadlines ?? []) as Row[];
+    if (!rows.length) return <EmptyCard text="No upcoming deadlines." />;
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+          <CalendarClockIcon className="text-primary size-4" />
+          <CardTitle className="text-sm">Upcoming deadlines ({rows.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {rows.map((d, i) => (
+            <div key={i} className="flex items-center justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate">{String(d.title)}</span>
+              <div className="flex shrink-0 items-center gap-2">
+                {d.amount ? <span className="text-muted-foreground text-xs">{inr(d.amount as number)}</span> : null}
+                <Badge variant={d.overdue ? "destructive" : "outline"}>{String(d.date)}</Badge>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (name === "list_invoices" || name === "list_overdue_invoices") {
     const rows = (data.invoices ?? data.overdue ?? []) as Row[];
     if (!rows.length) {
       return <EmptyCard text={name === "list_overdue_invoices" ? "No overdue invoices 🎉" : "No invoices yet."} />;
     }
+    const isOverdueList = name === "list_overdue_invoices";
     return (
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">
-            {name === "list_overdue_invoices" ? "Overdue invoices" : "Invoices"} ({rows.length})
+            {isOverdueList ? "Overdue invoices" : "Invoices"} ({rows.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="px-0 pb-0">
@@ -125,7 +187,7 @@ export function ToolResultCard({ name, result }: { name: string; result: unknown
                 <TableHead>Invoice</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead>Status / Due</TableHead>
+                <TableHead>{isOverdueList ? "Action" : "Status / Due"}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -135,7 +197,17 @@ export function ToolResultCard({ name, result }: { name: string; result: unknown
                   <TableCell>{clientName(r)}</TableCell>
                   <TableCell className="text-right">{inr(r.total as number)}</TableCell>
                   <TableCell>
-                    {r.status ? (
+                    {isOverdueList && onAction ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1 text-xs"
+                        onClick={() =>
+                          onAction(`Send a payment reminder for invoice ${String(r.invoice_number)}.`)
+                        }>
+                        <BellIcon className="size-3" /> Send reminder
+                      </Button>
+                    ) : r.status ? (
                       <Badge variant={STATUS_VARIANT[String(r.status)] ?? "secondary"}>
                         {String(r.status)}
                       </Badge>
@@ -203,13 +275,16 @@ const CONFIRM_TITLES: Record<string, string> = {
   create_invoice: "Create invoice",
   record_payment: "Record payment",
   create_client: "Create client",
+  send_invoice_reminder: "Send payment reminder",
 };
 
 const FIELD_LABELS: Record<string, string> = {
   invoice_type: "Type",
+  invoice_number: "Invoice",
   due_date: "Due date",
   tax_rate: "GST",
   notes: "Notes",
+  custom_message: "Message",
   name: "Name",
   email: "Email",
   company: "Company",

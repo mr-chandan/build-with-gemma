@@ -94,7 +94,11 @@ export default function AIChatInterface() {
               return (
                 <Message key={item.id} className="justify-start">
                   <div className="max-w-[85%] flex-1 sm:max-w-[75%]">
-                    <ToolResultCard name={item.name} result={item.result} />
+                    <ToolResultCard
+                    name={item.name}
+                    result={item.result}
+                    onAction={(text) => void send(text)}
+                  />
                   </div>
                 </Message>
               );

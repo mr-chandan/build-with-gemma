@@ -13,7 +13,14 @@ import {
   SidebarMenuSubItem,
   useSidebar
 } from "@/components/ui/sidebar";
-import { BrainCircuitIcon, ChevronRight, type LucideIcon } from "lucide-react";
+import {
+  BrainCircuitIcon,
+  ChevronRight,
+  FileTextIcon,
+  UsersIcon,
+  WalletIcon,
+  type LucideIcon
+} from "lucide-react";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { usePathname } from "next/navigation";
@@ -43,12 +50,27 @@ type NavItem = {
 
 export const navItems: NavGroup[] = [
   {
-    title: "AI Apps",
+    title: "Kubera",
     items: [
       {
-        title: "AI Chat V2",
+        title: "AI Assistant",
         href: "/dashboard/apps/ai-chat-v2",
         icon: BrainCircuitIcon
+      },
+      {
+        title: "Invoices",
+        href: "/dashboard/invoices",
+        icon: FileTextIcon
+      },
+      {
+        title: "Clients",
+        href: "/dashboard/clients",
+        icon: UsersIcon
+      },
+      {
+        title: "Cash Flow",
+        href: "/dashboard/cash-flow",
+        icon: WalletIcon
       }
     ]
   }
