@@ -33,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { GstUsernameModal } from "./gst-username-modal";
 
 export function inr(n: number | string | undefined | null): string {
   const v = typeof n === "string" ? Number(n) : (n ?? 0);
@@ -240,21 +241,58 @@ export function ToolResultCard({
     );
   }
 
+  if (name === "request_gst_otp") {
+    if (data.needsUsername) {
+      return (
+        <Card>
+          <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+            <KeyRoundIcon className="text-primary size-4" />
+            <CardTitle className="text-sm">GST portal username needed</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-muted-foreground text-sm">
+              To file, add your GST portal username. The OTP will be sent to your GST-registered
+              mobile.
+            </p>
+            <GstUsernameModal
+              onSaved={() =>
+                onAction?.("I've added my GST portal username. Please request the OTP now.")
+              }
+            />
+          </CardContent>
+        </Card>
+      );
+    }
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+          <KeyRoundIcon className="text-primary size-4" />
+          <CardTitle className="text-sm">OTP sent to your registered mobile</CardTitle>
+        </CardHeader>
+        <CardContent className="text-muted-foreground text-sm">
+          A GST portal OTP was sent for {String(data.gstin ?? "your GSTIN")}. Tell me the OTP to
+          file the return.
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (name === "prepare_gst_return" || name === "file_gst_return") {
-    if (data.empty) return <EmptyCard text="No invoices in this period to file GST for." />;
+    if (data.empty) return <EmptyCard text={`No invoices in ${String(data.period ?? "this period")} to prepare GST for.`} />;
+    if (data.needsProfile) return <EmptyCard text="Tell me your GSTIN first so I can prepare your GST return." />;
+    const filed = name === "file_gst_return" && data.filed;
     const s = (data.summary ?? {}) as Row;
     const counts = (s.counts ?? {}) as Row;
-    const filed = name === "file_gst_return" && data.filed;
     return (
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
           <div className="flex items-center gap-2">
             <LandmarkIcon className="text-primary size-4" />
             <CardTitle className="text-sm">
-              {filed ? "GSTR-1 filed (sandbox)" : "GST return prepared"} — {String(s.period ?? "")}
+              {filed ? "GSTR-1 filed" : "GST return prepared"} — {String(s.period ?? "")}
             </CardTitle>
           </div>
-          {filed ? <Badge variant="default">filed</Badge> : <Badge variant="secondary">draft</Badge>}
+          <Badge variant={filed ? "default" : "secondary"}>{filed ? "filed" : "GSTR-1 + 3B"}</Badge>
         </CardHeader>
         <CardContent className="space-y-1 text-sm">
           <Row2 label="Invoices" value={`${String(counts.total ?? 0)} (B2B ${String(counts.b2b ?? 0)} · B2C ${String(counts.b2c ?? 0)})`} />
@@ -266,26 +304,70 @@ export function ToolResultCard({
             <span>Total tax (GSTR-3B)</span>
             <span>{inr(s.totalTax as number)}</span>
           </div>
-          {!filed && (
-            <p className="text-muted-foreground pt-1 text-xs">
-              GSTIN {String(data.gstin ?? "")}. Ask me to file it on the sandbox to submit.
-            </p>
-          )}
+          <p className="text-muted-foreground pt-1 text-xs">GSTIN {String(data.gstin ?? "")}</p>
         </CardContent>
       </Card>
     );
   }
 
-  if (name === "request_gst_otp") {
+  if (name === "set_gst_profile" || name === "get_gst_details") {
+    const d = (data.details ?? {}) as Row;
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+          <LandmarkIcon className="text-primary size-4" />
+          <CardTitle className="text-sm">
+            {name === "set_gst_profile" ? "GST profile saved & verified" : "GST taxpayer details"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1 text-sm">
+          <div className="font-medium">{String(d.legalName ?? d.tradeName ?? d.gstin ?? "—")}</div>
+          <Row2 label="GSTIN" value={String(d.gstin ?? "")} />
+          {d.tradeName ? <Row2 label="Trade name" value={String(d.tradeName)} /> : null}
+          {d.status ? <Row2 label="Status" value={String(d.status)} /> : null}
+          {d.taxpayerType ? <Row2 label="Type" value={String(d.taxpayerType)} /> : null}
+          {d.constitution ? <Row2 label="Constitution" value={String(d.constitution)} /> : null}
+          {d.registrationDate ? <Row2 label="Registered" value={String(d.registrationDate)} /> : null}
+          {d.address ? <p className="text-muted-foreground pt-1 text-xs">{String(d.address)}</p> : null}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (name === "get_gst_return_status") {
+    const rows = (data.filings ?? []) as Row[];
+    if (!rows.length) return <EmptyCard text={`No filings found for ${String(data.fy ?? "")}.`} />;
     return (
       <Card>
         <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
           <KeyRoundIcon className="text-primary size-4" />
-          <CardTitle className="text-sm">GST OTP sent</CardTitle>
+          <CardTitle className="text-sm">GST filings — {String(data.fy ?? "")} ({rows.length})</CardTitle>
         </CardHeader>
-        <CardContent className="text-muted-foreground text-sm">
-          An OTP was sent for the sandbox GST account ({String(data.gstin ?? "")}). Tell me the OTP
-          to file the return.
+        <CardContent className="px-0 pb-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Return</TableHead>
+                <TableHead>Period</TableHead>
+                <TableHead>Filed</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r, i) => (
+                <TableRow key={i}>
+                  <TableCell className="font-medium">{String(r.rtntype)}</TableCell>
+                  <TableCell>{String(r.ret_prd)}</TableCell>
+                  <TableCell className="text-muted-foreground">{String(r.dof || "—")}</TableCell>
+                  <TableCell>
+                    <Badge variant={String(r.status).toUpperCase() === "FILED" ? "default" : "secondary"}>
+                      {String(r.status)}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     );
@@ -426,8 +508,9 @@ const CONFIRM_TITLES: Record<string, string> = {
   send_invoice_reminder: "Send payment reminder",
   create_calendar_event: "Add to Google Calendar",
   send_gmail: "Send email from Gmail",
-  request_gst_otp: "Request GST OTP (sandbox)",
-  file_gst_return: "File GSTR-1 on the sandbox",
+  set_gst_profile: "Save & verify your GST details",
+  request_gst_otp: "Request GST portal OTP",
+  file_gst_return: "File GSTR-1 to the GST portal",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -452,9 +535,10 @@ const FIELD_LABELS: Record<string, string> = {
   method: "Method",
   reference: "Reference",
   paid_on: "Date",
-  otp: "OTP",
   month: "Month",
   year: "Year",
+  gst_username: "GST username",
+  otp: "OTP",
 };
 
 // Internal ids and structured fields are handled separately or hidden.

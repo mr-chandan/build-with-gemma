@@ -7,8 +7,6 @@
  * builds both a human summary and the WhiteBooks /gstr1/retsave payload.
  */
 
-import { GST_ACCOUNT } from "./wb";
-
 export type PrepInvoice = {
   invoice_number: string;
   issue_date: string;
@@ -52,10 +50,11 @@ type Item = { num: number; itm_det: { rt: number; txval: number; iamt: number; c
 export function prepareReturn(
   invoices: PrepInvoice[],
   year: number,
-  month1to12: number
+  month1to12: number,
+  supplierGstin: string
 ): { summary: GstSummary; payload: Record<string, unknown> } {
   const fp = retPeriod(year, month1to12);
-  const supplierState = GST_ACCOUNT.stateCode;
+  const supplierState = /^\d{2}/.test(supplierGstin) ? supplierGstin.slice(0, 2) : "27";
 
   let taxable = 0,
     igst = 0,
@@ -117,7 +116,7 @@ export function prepareReturn(
   }
 
   const payload: Record<string, unknown> = {
-    gstin: GST_ACCOUNT.gstin,
+    gstin: supplierGstin,
     fp,
     gt: round2(invoiceTotal),
     cur_gt: round2(invoiceTotal),
@@ -146,7 +145,7 @@ export function prepareReturn(
 
   const summary: GstSummary = {
     period: fp,
-    supplierGstin: GST_ACCOUNT.gstin,
+    supplierGstin,
     counts: { b2b: b2bCount, b2c: b2cCount, total: invoices.length },
     taxable: round2(taxable),
     igst,
