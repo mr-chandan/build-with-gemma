@@ -17,6 +17,16 @@ export function GoogleSignInButton() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/kubera`,
+        // Gmail (read + send) and Calendar (read + write) so Kubera can read and manage the
+        // user's mail and calendar. offline + consent forces Google to return a refresh token
+        // WITH these scopes every time (otherwise a repeat sign-in silently reuses the old grant).
+        scopes: [
+          "https://www.googleapis.com/auth/gmail.readonly",
+          "https://www.googleapis.com/auth/gmail.send",
+          "https://www.googleapis.com/auth/calendar.events",
+          "https://www.googleapis.com/auth/calendar.readonly",
+        ].join(" "),
+        queryParams: { access_type: "offline", prompt: "consent" },
       },
     });
     if (error) {
