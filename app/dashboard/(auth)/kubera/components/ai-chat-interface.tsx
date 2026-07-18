@@ -29,8 +29,6 @@ const SUGGESTIONS = [
   "Fetch my invoice data",
   "Create an invoice",
   "Show my overdue invoices",
-  "Forecast my cash flow",
-  "Any liquidity risks?",
   "List my clients",
   "Summarize this month",
 ];
