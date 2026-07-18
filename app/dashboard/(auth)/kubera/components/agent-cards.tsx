@@ -16,6 +16,8 @@ import {
   SendIcon,
   MailIcon,
   CalendarIcon,
+  LandmarkIcon,
+  KeyRoundIcon,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -238,6 +240,57 @@ export function ToolResultCard({
     );
   }
 
+  if (name === "prepare_gst_return" || name === "file_gst_return") {
+    if (data.empty) return <EmptyCard text="No invoices in this period to file GST for." />;
+    const s = (data.summary ?? {}) as Row;
+    const counts = (s.counts ?? {}) as Row;
+    const filed = name === "file_gst_return" && data.filed;
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+          <div className="flex items-center gap-2">
+            <LandmarkIcon className="text-primary size-4" />
+            <CardTitle className="text-sm">
+              {filed ? "GSTR-1 filed (sandbox)" : "GST return prepared"} — {String(s.period ?? "")}
+            </CardTitle>
+          </div>
+          {filed ? <Badge variant="default">filed</Badge> : <Badge variant="secondary">draft</Badge>}
+        </CardHeader>
+        <CardContent className="space-y-1 text-sm">
+          <Row2 label="Invoices" value={`${String(counts.total ?? 0)} (B2B ${String(counts.b2b ?? 0)} · B2C ${String(counts.b2c ?? 0)})`} />
+          <Row2 label="Taxable value" value={inr(s.taxable as number)} />
+          <Row2 label="IGST" value={inr(s.igst as number)} />
+          <Row2 label="CGST" value={inr(s.cgst as number)} />
+          <Row2 label="SGST" value={inr(s.sgst as number)} />
+          <div className="flex justify-between border-t pt-1 font-medium">
+            <span>Total tax (GSTR-3B)</span>
+            <span>{inr(s.totalTax as number)}</span>
+          </div>
+          {!filed && (
+            <p className="text-muted-foreground pt-1 text-xs">
+              GSTIN {String(data.gstin ?? "")}. Ask me to file it on the sandbox to submit.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (name === "request_gst_otp") {
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+          <KeyRoundIcon className="text-primary size-4" />
+          <CardTitle className="text-sm">GST OTP sent</CardTitle>
+        </CardHeader>
+        <CardContent className="text-muted-foreground text-sm">
+          An OTP was sent for the sandbox GST account ({String(data.gstin ?? "")}). Tell me the OTP
+          to file the return.
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (name === "list_deadlines") {
     const rows = (data.deadlines ?? []) as Row[];
     if (!rows.length) return <EmptyCard text="No upcoming deadlines." />;
@@ -373,6 +426,8 @@ const CONFIRM_TITLES: Record<string, string> = {
   send_invoice_reminder: "Send payment reminder",
   create_calendar_event: "Add to Google Calendar",
   send_gmail: "Send email from Gmail",
+  request_gst_otp: "Request GST OTP (sandbox)",
+  file_gst_return: "File GSTR-1 on the sandbox",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -397,6 +452,9 @@ const FIELD_LABELS: Record<string, string> = {
   method: "Method",
   reference: "Reference",
   paid_on: "Date",
+  otp: "OTP",
+  month: "Month",
+  year: "Year",
 };
 
 // Internal ids and structured fields are handled separately or hidden.

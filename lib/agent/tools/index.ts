@@ -21,6 +21,7 @@ import {
   listCalendarEventsTool,
   listGmailTool,
 } from "./google";
+import { prepareGstReturnTool, requestGstOtpTool, fileGstReturnTool } from "./gst";
 
 export const TOOLS: AnyTool[] = [
   pingTool,
@@ -36,6 +37,9 @@ export const TOOLS: AnyTool[] = [
   sendGmailTool,
   listCalendarEventsTool,
   listGmailTool,
+  prepareGstReturnTool,
+  requestGstOtpTool,
+  fileGstReturnTool,
 ];
 
 export function getTool(name: string): AnyTool | undefined {
