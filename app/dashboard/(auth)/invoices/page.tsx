@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 
 import { createServiceClient } from "@/utils/supabase/service";
+import { createClient } from "@/utils/supabase/server";
 import { inr } from "@/lib/format";
-import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { Card, CardDescription, CardHeader } from "@/components/ui/card";
 import InvoiceList, { Invoice } from "./invoice-list";
 
@@ -25,6 +27,12 @@ function pctChange(curr: number, prev: number): number | null {
 }
 
 export default async function InvoicesPage() {
+  const cookieStore = await cookies();
+  const {
+    data: { user },
+  } = await createClient(cookieStore).auth.getUser();
+  const uid = user?.id ?? "";
+
   const supabase = createServiceClient();
 
   const { data: invoices } = await supabase
@@ -32,6 +40,7 @@ export default async function InvoicesPage() {
     .select(
       "id, invoice_number, invoice_type, status, issue_date, due_date, total, amount_paid, clients(name, company)"
     )
+    .eq("user_id", uid)
     .order("issue_date", { ascending: false });
 
   const raw = invoices ?? [];

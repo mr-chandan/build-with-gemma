@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import {
   CheckIcon,
   XIcon,
+  PlusIcon,
   FileTextIcon,
   UserPlusIcon,
   ReceiptIndianRupeeIcon,
@@ -10,11 +12,17 @@ import {
   MailCheckIcon,
   BellIcon,
   CalendarClockIcon,
+  CalendarPlusIcon,
+  SendIcon,
+  MailIcon,
+  CalendarIcon,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -138,6 +146,93 @@ export function ToolResultCard({
             {inr(data.amount as number)}
             {data.overdue ? " (overdue)" : ""}.
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (name === "create_calendar_event") {
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+          <CalendarPlusIcon className="text-primary size-4" />
+          <CardTitle className="text-sm">Added to Google Calendar</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1 text-sm">
+          <div className="font-medium">{String(data.summary)}</div>
+          <div className="text-muted-foreground text-xs">{String(data.date)}</div>
+          {data.link ? (
+            <a
+              href={String(data.link)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary text-xs underline underline-offset-2">
+              Open in Calendar
+            </a>
+          ) : null}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (name === "send_gmail") {
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+          <SendIcon className="size-4 text-emerald-600" />
+          <CardTitle className="text-sm">Email sent from Gmail</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm">
+          <div className="text-muted-foreground">
+            To <span className="text-foreground">{String(data.to)}</span> — {String(data.subject)}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (name === "list_gmail") {
+    const rows = (data.messages ?? []) as Row[];
+    if (!rows.length) return <EmptyCard text="No emails found." />;
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+          <MailIcon className="text-primary size-4" />
+          <CardTitle className="text-sm">Inbox ({rows.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2.5">
+          {rows.map((m, i) => (
+            <div key={i} className="border-b pb-2 last:border-0 last:pb-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm font-medium">{String(m.subject)}</span>
+              </div>
+              <div className="text-muted-foreground truncate text-xs">{String(m.from)}</div>
+              <div className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{String(m.snippet)}</div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (name === "list_calendar_events") {
+    const rows = (data.events ?? []) as Row[];
+    if (!rows.length) return <EmptyCard text="No upcoming events." />;
+    return (
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+          <CalendarIcon className="text-primary size-4" />
+          <CardTitle className="text-sm">Upcoming events ({rows.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {rows.map((e, i) => (
+            <div key={i} className="flex items-center justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate">{String(e.summary)}</span>
+              <span className="text-muted-foreground shrink-0 text-xs">
+                {String(e.start).slice(0, 16).replace("T", " ")}
+              </span>
+            </div>
+          ))}
         </CardContent>
       </Card>
     );
@@ -276,6 +371,8 @@ const CONFIRM_TITLES: Record<string, string> = {
   record_payment: "Record payment",
   create_client: "Create client",
   send_invoice_reminder: "Send payment reminder",
+  create_calendar_event: "Add to Google Calendar",
+  send_gmail: "Send email from Gmail",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -285,6 +382,11 @@ const FIELD_LABELS: Record<string, string> = {
   tax_rate: "GST",
   notes: "Notes",
   custom_message: "Message",
+  summary: "Event",
+  date: "Date",
+  to: "To",
+  subject: "Subject",
+  body: "Message",
   name: "Name",
   email: "Email",
   company: "Company",
@@ -309,7 +411,33 @@ function confirmValue(key: string, value: unknown): string {
   return String(value);
 }
 
-/** Human-in-the-loop confirmation — a readable preview of what will happen (no JSON). */
+// Scalar fields that make sense to edit inline, and their input type.
+const EDIT_FIELDS: Record<string, { type: "text" | "number" | "date" | "email" | "select"; options?: string[] }> = {
+  invoice_type: { type: "select", options: ["b2b", "b2c"] },
+  due_date: { type: "date" },
+  tax_rate: { type: "number" },
+  notes: { type: "text" },
+  name: { type: "text" },
+  email: { type: "email" },
+  company: { type: "text" },
+  gstin: { type: "text" },
+  phone: { type: "text" },
+  address: { type: "text" },
+  amount: { type: "number" },
+  method: { type: "text" },
+  reference: { type: "text" },
+  paid_on: { type: "date" },
+  invoice_number: { type: "text" },
+  custom_message: { type: "text" },
+  summary: { type: "text" },
+  date: { type: "date" },
+  to: { type: "email" },
+  subject: { type: "text" },
+  body: { type: "text" },
+};
+
+/** Human-in-the-loop confirmation — inline-editable fields + Save. The user can tweak the
+ *  details right here before it runs; approved values override what the agent proposed. */
 export function ConfirmCard({
   name,
   args,
@@ -319,68 +447,148 @@ export function ConfirmCard({
 }: {
   name: string;
   args: Record<string, unknown>;
-  onApprove: () => void;
+  onApprove: (edited: Record<string, unknown>) => void;
   onReject: () => void;
   disabled?: boolean;
 }) {
   const title = CONFIRM_TITLES[name] ?? name;
-  const items = (Array.isArray(args.items) ? args.items : []) as LineItem[];
-  const taxRate = Number(args.tax_rate ?? 18);
 
-  const rows = items.map((it) => ({
-    description: it.description ?? "Item",
-    quantity: Number(it.quantity ?? 1),
-    unit_price: Number(it.unit_price ?? 0),
-    amount: Number(it.quantity ?? 1) * Number(it.unit_price ?? 0),
-  }));
-  const subtotal = rows.reduce((s, r) => s + r.amount, 0);
+  const [fields, setFields] = useState<Record<string, unknown>>(() => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(args)) {
+      if (!CONFIRM_HIDDEN.has(k) && typeof v !== "object") out[k] = v;
+    }
+    return out;
+  });
+  const [items, setItems] = useState<LineItem[]>(() =>
+    (Array.isArray(args.items) ? args.items : []).map((it: LineItem) => ({
+      description: it.description ?? "",
+      quantity: Number(it.quantity ?? 1),
+      unit_price: Number(it.unit_price ?? 0),
+    }))
+  );
+
+  const setField = (k: string, v: unknown) => setFields((p) => ({ ...p, [k]: v }));
+  const setItem = (i: number, patch: Partial<LineItem>) =>
+    setItems((p) => p.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+  const addItem = () => setItems((p) => [...p, { description: "", quantity: 1, unit_price: 0 }]);
+  const removeItem = (i: number) => setItems((p) => p.filter((_, idx) => idx !== i));
+
+  const hasItems = Array.isArray(args.items);
+  const taxRate = Number(fields.tax_rate ?? 18);
+  const subtotal = items.reduce((s, it) => s + Number(it.quantity ?? 0) * Number(it.unit_price ?? 0), 0);
   const tax = subtotal * (taxRate / 100);
   const total = subtotal + tax;
 
-  const entries = Object.entries(args).filter(
-    ([k, v]) => !CONFIRM_HIDDEN.has(k) && v !== null && v !== undefined && v !== "" && typeof v !== "object"
-  );
+  const save = () => {
+    // Rebuild the full args: preserve hidden ids, apply edited scalar fields + items.
+    const edited: Record<string, unknown> = { ...args, ...fields };
+    for (const [k, spec] of Object.entries(EDIT_FIELDS)) {
+      if (k in edited && spec.type === "number") edited[k] = Number(edited[k]);
+    }
+    if (hasItems) {
+      edited.items = items.map((it) => ({
+        description: it.description ?? "",
+        quantity: Number(it.quantity ?? 1),
+        unit_price: Number(it.unit_price ?? 0),
+      }));
+    }
+    onApprove(edited);
+  };
+
+  const editableEntries = Object.keys(fields).filter((k) => EDIT_FIELDS[k]);
 
   return (
     <div className="bg-background animate-in fade-in slide-in-from-bottom-2 w-full overflow-hidden rounded-xl border shadow-sm">
-      {/* Header — amber accent signals a human decision is needed */}
       <div className="flex items-center gap-2.5 border-b bg-amber-50/70 px-4 py-2.5 dark:bg-amber-950/20">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400">
           <AlertTriangleIcon className="size-4" />
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm leading-tight font-semibold">{title}</p>
-          <p className="text-muted-foreground text-xs">Review and approve to continue</p>
+          <p className="text-muted-foreground text-xs">Edit the details if needed, then save.</p>
         </div>
       </div>
 
       <div className="space-y-3 px-4 py-3">
-        {entries.length > 0 && (
-          <dl className="space-y-1.5">
-            {entries.map(([k, v]) => (
-              <div key={k} className="flex items-baseline justify-between gap-3 text-sm">
-                <dt className="text-muted-foreground shrink-0">{FIELD_LABELS[k] ?? k}</dt>
-                <dd className="text-foreground truncate text-right font-medium">{confirmValue(k, v)}</dd>
-              </div>
-            ))}
-          </dl>
+        {editableEntries.length > 0 && (
+          <div className="grid grid-cols-2 gap-2.5">
+            {editableEntries.map((k) => {
+              const spec = EDIT_FIELDS[k];
+              return (
+                <div key={k} className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">{FIELD_LABELS[k] ?? k}</Label>
+                  {spec.type === "select" ? (
+                    <select
+                      value={String(fields[k] ?? "")}
+                      onChange={(e) => setField(k, e.target.value)}
+                      disabled={disabled}
+                      className="border-input bg-background h-8 w-full rounded-md border px-2 text-sm">
+                      {spec.options?.map((o) => (
+                        <option key={o} value={o}>
+                          {o.toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      type={spec.type === "number" ? "number" : spec.type === "date" ? "date" : "text"}
+                      value={String(fields[k] ?? "")}
+                      onChange={(e) => setField(k, e.target.value)}
+                      disabled={disabled}
+                      className="h-8 text-sm"
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
 
-        {rows.length > 0 && (
-          <div className="bg-muted/30 rounded-lg border p-2.5">
-            <p className="text-muted-foreground mb-1.5 text-xs font-medium">Line items</p>
-            <div className="space-y-1">
-              {rows.map((r, i) => (
-                <div key={i} className="flex justify-between gap-3 text-sm">
-                  <span className="text-foreground min-w-0 truncate">
-                    {r.description}
-                    <span className="text-muted-foreground"> · {r.quantity} × {inr(r.unit_price)}</span>
-                  </span>
-                  <span className="text-foreground shrink-0 tabular-nums">{inr(r.amount)}</span>
-                </div>
-              ))}
+        {hasItems && (
+          <div className="bg-muted/30 space-y-2 rounded-lg border p-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground text-xs font-medium">Line items</p>
+              <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs" onClick={addItem} disabled={disabled}>
+                <PlusIcon className="size-3" /> Add
+              </Button>
             </div>
-            <div className="mt-1.5 space-y-1 border-t pt-1.5 text-sm">
+            {items.map((it, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <Input
+                  value={it.description ?? ""}
+                  placeholder="Description"
+                  onChange={(e) => setItem(i, { description: e.target.value })}
+                  disabled={disabled}
+                  className="h-8 flex-1 text-sm"
+                />
+                <Input
+                  type="number"
+                  value={String(it.quantity ?? 1)}
+                  onChange={(e) => setItem(i, { quantity: Number(e.target.value) })}
+                  disabled={disabled}
+                  className="h-8 w-14 text-sm"
+                  title="Qty"
+                />
+                <Input
+                  type="number"
+                  value={String(it.unit_price ?? 0)}
+                  onChange={(e) => setItem(i, { unit_price: Number(e.target.value) })}
+                  disabled={disabled}
+                  className="h-8 w-20 text-sm"
+                  title="Unit price"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0"
+                  onClick={() => removeItem(i)}
+                  disabled={disabled}>
+                  <XIcon className="size-3.5" />
+                </Button>
+              </div>
+            ))}
+            <div className="space-y-1 border-t pt-1.5 text-sm">
               <div className="text-muted-foreground flex justify-between">
                 <span>Subtotal</span>
                 <span className="tabular-nums">{inr(subtotal)}</span>
@@ -399,8 +607,8 @@ export function ConfirmCard({
       </div>
 
       <div className="flex gap-2 border-t px-4 py-2.5">
-        <Button size="sm" onClick={onApprove} disabled={disabled} className="flex-1 gap-1.5">
-          <CheckIcon className="size-4" /> Approve
+        <Button size="sm" onClick={save} disabled={disabled} className="flex-1 gap-1.5">
+          <CheckIcon className="size-4" /> Save &amp; confirm
         </Button>
         <Button size="sm" variant="outline" onClick={onReject} disabled={disabled} className="flex-1 gap-1.5">
           <XIcon className="size-4" /> Cancel

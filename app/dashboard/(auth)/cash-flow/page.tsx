@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { ArrowDownLeftIcon, ArrowUpRightIcon, WalletIcon } from "lucide-react";
 
 import { createServiceClient } from "@/utils/supabase/service";
+import { createClient } from "@/utils/supabase/server";
 import { inr, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,10 +21,16 @@ export const metadata: Metadata = { title: "Cash Flow — Kubera.ai" };
 export const dynamic = "force-dynamic";
 
 export default async function CashFlowPage() {
+  const cookieStore = await cookies();
+  const {
+    data: { user },
+  } = await createClient(cookieStore).auth.getUser();
+
   const supabase = createServiceClient();
   const { data: entries } = await supabase
     .from("cash_flow_entries")
     .select("id, entry_date, type, category, description, amount, source")
+    .eq("user_id", user?.id ?? "")
     .order("entry_date", { ascending: false })
     .limit(100);
 

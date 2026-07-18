@@ -5,9 +5,12 @@ import type { Tool } from "../types";
 
 type SupabaseClient = ReturnType<typeof createServiceClient>;
 
-/** Next sequential invoice number, e.g. INV-0001. */
-async function nextInvoiceNumber(supabase: SupabaseClient): Promise<string> {
-  const { count } = await supabase.from("invoices").select("id", { count: "exact", head: true });
+/** Next sequential invoice number for this user, e.g. INV-0001. */
+async function nextInvoiceNumber(supabase: SupabaseClient, userId: string): Promise<string> {
+  const { count } = await supabase
+    .from("invoices")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
   const n = (count ?? 0) + 1;
   return `INV-${String(n).padStart(4, "0")}`;
 }
@@ -27,7 +30,7 @@ export const listInvoicesTool: Tool = {
     client_id: z.string().uuid().optional(),
     limit: z.number().int().positive().max(100).default(25),
   }),
-  handler: async (input) => {
+  handler: async (input, ctx) => {
     const { status, client_id, limit } = input as {
       status?: string;
       client_id?: string;
@@ -39,6 +42,7 @@ export const listInvoicesTool: Tool = {
       .select(
         "id, invoice_number, invoice_type, status, issue_date, due_date, currency, total, amount_paid, clients(name, company)"
       )
+      .eq("user_id", ctx.userId)
       .order("issue_date", { ascending: false })
       .limit(limit);
     if (status) query = query.eq("status", status);
@@ -62,7 +66,7 @@ export const createInvoiceTool: Tool = {
     due_date: z.string().describe("ISO date (YYYY-MM-DD) the payment is due."),
     notes: z.string().optional(),
   }),
-  handler: async (input) => {
+  handler: async (input, ctx) => {
     const args = input as {
       client_id: string;
       invoice_type: "b2b" | "b2c";
@@ -83,13 +87,14 @@ export const createInvoiceTool: Tool = {
     const subtotal = Number(items.reduce((s, it) => s + it.amount, 0).toFixed(2));
     const tax_amount = Number((subtotal * (args.tax_rate / 100)).toFixed(2));
     const total = Number((subtotal + tax_amount).toFixed(2));
-    const invoice_number = await nextInvoiceNumber(supabase);
+    const invoice_number = await nextInvoiceNumber(supabase, ctx.userId);
 
     const { data: invoice, error } = await supabase
       .from("invoices")
       .insert({
         invoice_number,
         client_id: args.client_id,
+        user_id: ctx.userId,
         invoice_type: args.invoice_type,
         status: "sent",
         due_date: args.due_date,
@@ -124,7 +129,7 @@ export const recordPaymentTool: Tool = {
     reference: z.string().optional().describe("UTR / transaction reference."),
     paid_on: z.string().optional().describe("ISO date; defaults to today."),
   }),
-  handler: async (input) => {
+  handler: async (input, ctx) => {
     const args = input as {
       invoice_id: string;
       amount: number;
@@ -138,6 +143,7 @@ export const recordPaymentTool: Tool = {
       .from("invoices")
       .select("id, invoice_number, total, amount_paid, client_id")
       .eq("id", args.invoice_id)
+      .eq("user_id", ctx.userId)
       .single();
     if (invErr || !inv) return { error: invErr?.message ?? "Invoice not found" };
 
@@ -145,6 +151,7 @@ export const recordPaymentTool: Tool = {
 
     const { error: payErr } = await supabase.from("invoice_payments").insert({
       invoice_id: args.invoice_id,
+      user_id: ctx.userId,
       amount: args.amount,
       method: args.method ?? null,
       reference: args.reference ?? null,
@@ -172,6 +179,7 @@ export const recordPaymentTool: Tool = {
       amount: args.amount,
       source: "invoice",
       invoice_id: args.invoice_id,
+      user_id: ctx.userId,
     });
 
     return {
@@ -189,7 +197,7 @@ export const listOverdueInvoicesTool: Tool = {
   description:
     "List invoices that are past their due date and not fully paid — the ones to chase for payment.",
   schema: z.object({}),
-  handler: async () => {
+  handler: async (_input, ctx) => {
     const supabase = createServiceClient();
     const today = new Date().toISOString().slice(0, 10);
     const { data, error } = await supabase
@@ -197,6 +205,7 @@ export const listOverdueInvoicesTool: Tool = {
       .select(
         "id, invoice_number, due_date, total, amount_paid, clients(name, email, company)"
       )
+      .eq("user_id", ctx.userId)
       .in("status", ["sent", "overdue"])
       .lt("due_date", today)
       .order("due_date", { ascending: true });

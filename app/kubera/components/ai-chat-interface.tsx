@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { ArrowUpIcon, MicIcon, SquareIcon } from "lucide-react";
+import { ArrowUpIcon, MicIcon, SquareIcon, MessageSquarePlusIcon, Trash2Icon, MessagesSquareIcon } from "lucide-react";
 import { PlusIcon } from "@radix-ui/react-icons";
 
 import {
@@ -24,7 +24,18 @@ import { ToolResultCard, ConfirmCard } from "./agent-cards";
 
 export default function AIChatInterface() {
   const [prompt, setPrompt] = useState("");
-  const { items, isStreaming, send, approve, reject, reset } = useAgentChat();
+  const {
+    items,
+    isStreaming,
+    conversations,
+    conversationId,
+    send,
+    approve,
+    reject,
+    newChat,
+    loadConversation,
+    deleteConversation,
+  } = useAgentChat();
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -40,12 +51,51 @@ export default function AIChatInterface() {
   };
 
   const handleNewChat = () => {
-    reset();
+    newChat();
     setPrompt("");
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
+      {/* CHAT HISTORY — persistent left rail. */}
+      <aside className="bg-muted/30 hidden w-60 shrink-0 flex-col border-r md:flex">
+        <div className="p-3">
+          <Button className="w-full justify-start gap-2" size="sm" onClick={handleNewChat}>
+            <MessageSquarePlusIcon className="size-4" />
+            New chat
+          </Button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          {conversations.length === 0 ? (
+            <p className="text-muted-foreground px-2 py-4 text-center text-xs">No chats yet.</p>
+          ) : (
+            conversations.map((c) => (
+              <div
+                key={c.id}
+                className={cn(
+                  "group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm",
+                  c.id === conversationId ? "bg-primary/10 text-foreground" : "hover:bg-muted"
+                )}>
+                <button
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  onClick={() => void loadConversation(c.id)}>
+                  <MessagesSquareIcon className="text-muted-foreground size-3.5 shrink-0" />
+                  <span className="truncate">{c.title}</span>
+                </button>
+                <button
+                  className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={() => void deleteConversation(c.id)}
+                  title="Delete chat">
+                  <Trash2Icon className="size-3.5" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </aside>
+
+      {/* CHAT COLUMN */}
+      <div className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
       {/* HEADER — pinned. */}
       <div className={cn("shrink-0", started && "bg-background/80 border-b backdrop-blur-md")}>
         <div className="mx-auto flex w-full max-w-4xl items-center gap-2 px-4 py-3">
@@ -111,7 +161,7 @@ export default function AIChatInterface() {
                     name={item.name}
                     args={item.args}
                     disabled={isStreaming}
-                    onApprove={() => approve(item.id)}
+                    onApprove={(edited) => approve(item.id, edited)}
                     onReject={() => reject(item.id)}
                   />
                 </div>
@@ -189,6 +239,7 @@ export default function AIChatInterface() {
             </PromptInputActions>
           </Input>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ export const listDeadlinesTool: Tool = {
   description:
     "List upcoming financial deadlines: GST return filing dates (GSTR-1, GSTR-3B) and the due dates of unpaid invoices. Use when the user asks what's due or coming up.",
   schema: z.object({}),
-  handler: async () => {
+  handler: async (_input, ctx) => {
     const supabase = createServiceClient();
     const today = new Date();
     const y = today.getFullYear();
@@ -33,6 +33,7 @@ export const listDeadlinesTool: Tool = {
     const { data: invoices, error } = await supabase
       .from("invoices")
       .select("id, invoice_number, due_date, total, amount_paid, clients(name, company)")
+      .eq("user_id", ctx.userId)
       .in("status", ["sent", "overdue"])
       .order("due_date", { ascending: true });
     if (error) return { error: error.message };

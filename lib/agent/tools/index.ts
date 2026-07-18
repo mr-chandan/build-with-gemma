@@ -15,6 +15,12 @@ import {
 } from "./invoices";
 import { sendInvoiceReminderTool } from "./reminders";
 import { listDeadlinesTool } from "./deadlines";
+import {
+  createCalendarEventTool,
+  sendGmailTool,
+  listCalendarEventsTool,
+  listGmailTool,
+} from "./google";
 
 export const TOOLS: AnyTool[] = [
   pingTool,
@@ -26,6 +32,10 @@ export const TOOLS: AnyTool[] = [
   listOverdueInvoicesTool,
   sendInvoiceReminderTool,
   listDeadlinesTool,
+  createCalendarEventTool,
+  sendGmailTool,
+  listCalendarEventsTool,
+  listGmailTool,
 ];
 
 export function getTool(name: string): AnyTool | undefined {

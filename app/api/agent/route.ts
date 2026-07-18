@@ -7,8 +7,10 @@
  */
 
 import { NextRequest } from "next/server";
+import { cookies } from "next/headers";
 
 import { runAgent } from "@/lib/agent/orchestrator";
+import { createClient } from "@/utils/supabase/server";
 import type { ChatMessage, ToolCall } from "@/lib/agent/types";
 
 export const runtime = "nodejs";
@@ -31,6 +33,14 @@ export async function POST(req: NextRequest) {
     return new Response("`messages` must be an array", { status: 400 });
   }
 
+  // The authenticated user id scopes the Google (Gmail/Calendar) tools to their token.
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const userId = user?.id ?? "dev-user";
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -40,7 +50,7 @@ export async function POST(req: NextRequest) {
         for await (const event of runAgent({
           messages: body.messages,
           approvedToolCall: body.approvedToolCall ?? null,
-          ctx: { userId: "dev-user" },
+          ctx: { userId },
         })) {
           send(event);
         }

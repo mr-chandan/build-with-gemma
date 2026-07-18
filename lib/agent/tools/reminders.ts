@@ -36,7 +36,7 @@ export const sendInvoiceReminderTool: Tool = {
     invoice_number: z.string().describe("The invoice number, e.g. INV-0001."),
     custom_message: z.string().optional().describe("Optional extra note to include."),
   }),
-  handler: async (input) => {
+  handler: async (input, ctx) => {
     const { invoice_number } = input as { invoice_number: string; custom_message?: string };
     const supabase = createServiceClient();
 
@@ -44,6 +44,7 @@ export const sendInvoiceReminderTool: Tool = {
       .from("invoices")
       .select("id, invoice_number, total, amount_paid, due_date, status, clients(name, company, email)")
       .eq("invoice_number", invoice_number)
+      .eq("user_id", ctx.userId)
       .single();
     if (error || !inv) return { error: error?.message ?? `Invoice ${invoice_number} not found` };
     const invoice_id = inv.id;
@@ -75,6 +76,7 @@ export const sendInvoiceReminderTool: Tool = {
 
     await supabase.from("invoice_reminders").insert({
       invoice_id,
+      user_id: ctx.userId,
       sent_to: client.email,
       subject,
       status,
