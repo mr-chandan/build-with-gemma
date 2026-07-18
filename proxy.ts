@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { updateSession } from "@/utils/supabase/middleware";
 
-const DASHBOARD_HOME = "/kubera";
+const DASHBOARD_HOME = "/dashboard/kubera";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

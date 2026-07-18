@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { ArrowUpIcon, MicIcon, SquareIcon, MessageSquarePlusIcon, Trash2Icon, MessagesSquareIcon } from "lucide-react";
+import { ArrowUpIcon, MicIcon, SquareIcon } from "lucide-react";
 import { PlusIcon } from "@radix-ui/react-icons";
 
 import {
@@ -21,6 +21,7 @@ import { GemmaDashboard } from "./dashboard/gemma-dashboard";
 import { useAgentChat } from "../hooks/use-agent-chat";
 import { useVoiceInput } from "../hooks/use-voice-input";
 import { ToolResultCard, ConfirmCard } from "./agent-cards";
+import ChatHistoryDialog from "./chat-history-dialog";
 
 export default function AIChatInterface() {
   const [prompt, setPrompt] = useState("");
@@ -40,6 +41,7 @@ export default function AIChatInterface() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const started = items.length > 0;
+  const currentTitle = conversations.find((c) => c.id === conversationId)?.title ?? null;
 
   const voice = useVoiceInput((text) => setPrompt((p) => (p ? `${p} ${text}` : text)));
 
@@ -56,58 +58,23 @@ export default function AIChatInterface() {
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
-      {/* CHAT HISTORY — persistent left rail. */}
-      <aside className="bg-muted/30 hidden w-60 shrink-0 flex-col border-r md:flex">
-        <div className="p-3">
-          <Button className="w-full justify-start gap-2" size="sm" onClick={handleNewChat}>
-            <MessageSquarePlusIcon className="size-4" />
-            New chat
-          </Button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {conversations.length === 0 ? (
-            <p className="text-muted-foreground px-2 py-4 text-center text-xs">No chats yet.</p>
-          ) : (
-            conversations.map((c) => (
-              <div
-                key={c.id}
-                className={cn(
-                  "group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm",
-                  c.id === conversationId ? "bg-primary/10 text-foreground" : "hover:bg-muted"
-                )}>
-                <button
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  onClick={() => void loadConversation(c.id)}>
-                  <MessagesSquareIcon className="text-muted-foreground size-3.5 shrink-0" />
-                  <span className="truncate">{c.title}</span>
-                </button>
-                <button
-                  className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={() => void deleteConversation(c.id)}
-                  title="Delete chat">
-                  <Trash2Icon className="size-3.5" />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      </aside>
-
-      {/* CHAT COLUMN */}
-      <div className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-      {/* HEADER — pinned. */}
+    <div className="relative flex h-full w-full min-w-0 flex-col overflow-hidden">
+      {/* HEADER — always pinned: title (left) + History / New Chat (right). */}
       <div className={cn("shrink-0", started && "bg-background/80 border-b backdrop-blur-md")}>
         <div className="mx-auto flex w-full max-w-4xl items-center gap-2 px-4 py-3">
           <div className="min-w-0 flex-1">
-            {started && <h2 className="truncate text-sm font-semibold">Kubera.ai</h2>}
+            {currentTitle && <h2 className="truncate text-sm font-semibold">{currentTitle}</h2>}
           </div>
-          {started && (
-            <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={handleNewChat}>
-              <PlusIcon className="size-4" />
-              New Chat
-            </Button>
-          )}
+          <ChatHistoryDialog
+            conversations={conversations}
+            conversationId={conversationId}
+            onSelect={(id) => void loadConversation(id)}
+            onDelete={(id) => void deleteConversation(id)}
+          />
+          <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={handleNewChat}>
+            <PlusIcon className="size-4" />
+            New Chat
+          </Button>
         </div>
       </div>
 
@@ -181,7 +148,7 @@ export default function AIChatInterface() {
           <div className="h-full w-full overflow-y-auto">
             <div className="mx-auto flex min-h-full w-full flex-col justify-center px-4 py-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/gemma-logo.png" alt="Kubera.ai" className="mx-auto mb-6 size-16" />
+              <img src="/gemma-logo.png" alt="Kubera.ai" className="mx-auto mb-0 size-16" />
               <h1 className="text-center text-2xl leading-normal font-medium lg:text-4xl">
                 Meet{" "}
                 <span className="bg-gradient-to-r from-purple-400 to-indigo-300 bg-clip-text text-transparent">
@@ -239,7 +206,6 @@ export default function AIChatInterface() {
             </PromptInputActions>
           </Input>
         </div>
-      </div>
       </div>
     </div>
   );

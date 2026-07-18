@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 import { ActionableDecisionsCard } from "./actionable-decisions-card";
 import { CashflowProjectionCard } from "./cashflow-projection-card";
-import { CfoRecommendationCard } from "./cfo-recommendation-card";
 import { LiquidityRiskCard } from "./liquidity-risk-card";
 
 export type Metrics = {
@@ -39,10 +38,9 @@ export function GemmaDashboard({
   }, []);
 
   return (
-    <div className="grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <CashflowProjectionCard metrics={metrics} />
       <LiquidityRiskCard metrics={metrics} />
-      <CfoRecommendationCard metrics={metrics} onAskGemma={onAskGemma} />
       <ActionableDecisionsCard metrics={metrics} onAskGemma={onAskGemma} />
     </div>
   );

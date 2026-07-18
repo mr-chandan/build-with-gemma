@@ -54,7 +54,7 @@ export const navItems: NavGroup[] = [
     items: [
       {
         title: "AI Assistant",
-        href: "/kubera",
+        href: "/dashboard/kubera",
         icon: BrainCircuitIcon
       },
       {
