@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   CheckIcon,
   XIcon,
@@ -18,9 +18,18 @@ import {
   CalendarIcon,
   LandmarkIcon,
   KeyRoundIcon,
+  Trash2Icon,
+  UsersIcon,
 } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +42,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDate } from "@/lib/format";
+import { InvoiceActions } from "@/components/invoice/invoice-actions";
+import type { InvoiceDoc } from "@/lib/invoice-pdf";
+
+// Hide the native number-input spinner arrows.
+const NO_SPINNER =
+  "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
 export function inr(n: number | string | undefined | null): string {
   const v = typeof n === "string" ? Number(n) : (n ?? 0);
@@ -53,6 +69,18 @@ function clientName(row: Row): string {
   return c?.company || c?.name || "—";
 }
 
+/** Up to two uppercase initials for an avatar. */
+function initials(s: string): string {
+  return (
+    s
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+
 /** Renders a tool result as a rich card, switching on the tool name.
  *  `onAction` lets a card trigger a follow-up chat message (e.g. "Send reminder"). */
 export function ToolResultCard({
@@ -68,10 +96,12 @@ export function ToolResultCard({
 
   if (data.error) {
     return (
-      <Card className="border-destructive/40">
-        <CardContent className="text-destructive flex items-center gap-2 p-4 text-sm">
-          <AlertTriangleIcon className="size-4" />
-          {String(data.error)}
+      <Card className="border-destructive/40 py-4">
+        <CardContent className="flex items-center gap-2.5">
+          <span className="bg-destructive/10 text-destructive flex size-9 shrink-0 items-center justify-center rounded-lg">
+            <AlertTriangleIcon className="size-4" />
+          </span>
+          <span className="text-destructive text-sm">{String(data.error)}</span>
         </CardContent>
       </Card>
     );
@@ -79,16 +109,43 @@ export function ToolResultCard({
 
   if (name === "create_client") {
     const c = data.client as Row;
+    const displayName = String(c?.company || c?.name || "—");
+    const details: Array<[string, string]> = [];
+    if (c?.gstin) details.push(["GSTIN", String(c.gstin)]);
+    if (c?.phone) details.push(["Phone", String(c.phone)]);
+    if (c?.address) details.push(["Address", String(c.address)]);
     return (
       <Card>
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center gap-2 space-y-0">
           <UserPlusIcon className="text-primary size-4" />
           <CardTitle className="text-sm">Client added</CardTitle>
+          <Badge variant="secondary" className="ml-auto">New</Badge>
         </CardHeader>
-        <CardContent className="text-sm">
-          <div className="font-medium">{String(c?.company || c?.name)}</div>
-          <div className="text-muted-foreground">{String(c?.email ?? "")}</div>
-          {c?.gstin ? <div className="text-muted-foreground text-xs">GSTIN: {String(c.gstin)}</div> : null}
+        <CardContent className="space-y-3 border-t pt-3">
+          <div className="flex items-center gap-3">
+            <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+              {initials(displayName)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{displayName}</div>
+              {c?.email ? (
+                <div className="text-muted-foreground flex items-center gap-1 truncate text-xs">
+                  <MailIcon className="size-3 shrink-0" />
+                  <span className="truncate">{String(c.email)}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {details.length > 0 && (
+            <div className="bg-muted/40 space-y-2.5 rounded-lg px-3 py-2.5 text-xs">
+              {details.map(([label, value]) => (
+                <div key={label} className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground shrink-0">{label}</span>
+                  <span className="truncate text-right font-medium">{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -96,40 +153,73 @@ export function ToolResultCard({
 
   if (name === "create_invoice") {
     const inv = data.invoice as Row;
+    const invClient = inv?.client as { name?: string; company?: string } | undefined;
+    const invoiceDoc: InvoiceDoc = {
+      invoiceNumber: String(inv?.invoice_number ?? ""),
+      client: invClient?.company || invClient?.name || undefined,
+      type: inv?.invoice_type ? String(inv.invoice_type) : undefined,
+      status: inv?.status ? String(inv.status) : "sent",
+      issueDate: inv?.issue_date ? String(inv.issue_date) : undefined,
+      dueDate: inv?.due_date ? String(inv.due_date) : undefined,
+      items: Array.isArray(inv?.items) ? (inv.items as InvoiceDoc["items"]) : undefined,
+      subtotal: inv?.subtotal != null ? Number(inv.subtotal) : undefined,
+      taxRate: inv?.tax_rate != null ? Number(inv.tax_rate) : undefined,
+      tax: inv?.tax_amount != null ? Number(inv.tax_amount) : undefined,
+      total: Number(inv?.total ?? 0),
+      notes: inv?.notes ? String(inv.notes) : undefined,
+    };
     return (
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-          <div className="flex items-center gap-2">
-            <FileTextIcon className="text-primary size-4" />
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
+            <FileTextIcon className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
             <CardTitle className="text-sm">Invoice {String(inv?.invoice_number)}</CardTitle>
+            <CardDescription className="truncate text-xs">
+              {invoiceDoc.client ? `${invoiceDoc.client} · ` : ""}Due {formatDate(inv?.due_date as string)}
+            </CardDescription>
           </div>
-          <Badge variant="secondary">{String(inv?.status ?? "sent")}</Badge>
+          <Badge variant="secondary" className="capitalize">{String(inv?.status ?? "sent")}</Badge>
         </CardHeader>
-        <CardContent className="space-y-1 text-sm">
-          <Row2 label="Subtotal" value={inr(inv?.subtotal as number)} />
-          <Row2 label="GST" value={inr(inv?.tax_amount as number)} />
-          <div className="flex justify-between border-t pt-1 font-medium">
-            <span>Total</span>
-            <span>{inr(inv?.total as number)}</span>
+        <CardContent>
+          <div className="bg-muted/40 space-y-2 rounded-lg px-3 py-3 text-sm">
+            <Row2 label="Subtotal" value={inr(inv?.subtotal as number)} />
+            <Row2 label="GST" value={inr(inv?.tax_amount as number)} />
+            <div className="text-foreground flex items-center justify-between border-t pt-2 text-base font-semibold">
+              <span>Total</span>
+              <span className="tabular-nums">{inr(inv?.total as number)}</span>
+            </div>
           </div>
-          <div className="text-muted-foreground text-xs">Due {String(inv?.due_date ?? "")}</div>
         </CardContent>
+        <CardFooter className="justify-end">
+          <InvoiceActions doc={invoiceDoc} />
+        </CardFooter>
       </Card>
     );
   }
 
   if (name === "record_payment") {
     return (
-      <Card>
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
-          <ReceiptIndianRupeeIcon className="text-primary size-4" />
-          <CardTitle className="text-sm">Payment recorded — {String(data.invoice_number)}</CardTitle>
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <ReceiptIndianRupeeIcon className="size-4" />
+          </CardIcon>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-sm">Payment recorded</CardTitle>
+            <CardDescription className="text-xs">{String(data.invoice_number)}</CardDescription>
+          </div>
+          <Badge variant={data.status === "paid" ? "default" : "secondary"} className="capitalize">
+            {String(data.status)}
+          </Badge>
         </CardHeader>
-        <CardContent className="space-y-1 text-sm">
-          <Row2 label="Paid" value={inr(data.amount_paid as number)} />
-          <Row2 label="Total" value={inr(data.total as number)} />
-          <Row2 label="Balance" value={inr(data.balance as number)} />
-          <Badge variant={data.status === "paid" ? "default" : "secondary"}>{String(data.status)}</Badge>
+        <CardContent>
+          <SummaryStrip>
+            <Row2 label="Paid" value={inr(data.amount_paid as number)} />
+            <Row2 label="Total" value={inr(data.total as number)} />
+            <TotalRow label="Balance" value={inr(data.balance as number)} />
+          </SummaryStrip>
         </CardContent>
       </Card>
     );
@@ -137,17 +227,20 @@ export function ToolResultCard({
 
   if (name === "send_invoice_reminder") {
     return (
-      <Card>
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
-          <MailCheckIcon className="size-4 text-emerald-600" />
-          <CardTitle className="text-sm">Reminder sent — {String(data.invoice_number)}</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm">
-          <div className="text-muted-foreground">
-            Emailed <span className="text-foreground">{String(data.sent_to)}</span> for{" "}
-            {inr(data.amount as number)}
-            {data.overdue ? " (overdue)" : ""}.
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <MailCheckIcon className="size-4" />
+          </CardIcon>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-sm">Reminder sent</CardTitle>
+            <CardDescription className="text-xs">{String(data.invoice_number)}</CardDescription>
           </div>
+          {data.overdue ? <Badge variant="destructive">overdue</Badge> : null}
+        </CardHeader>
+        <CardContent className="text-muted-foreground text-sm">
+          Emailed <span className="text-foreground font-medium">{String(data.sent_to)}</span> for{" "}
+          <span className="text-foreground font-medium">{inr(data.amount as number)}</span>.
         </CardContent>
       </Card>
     );
@@ -155,20 +248,24 @@ export function ToolResultCard({
 
   if (name === "create_calendar_event") {
     return (
-      <Card>
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
-          <CalendarPlusIcon className="text-primary size-4" />
-          <CardTitle className="text-sm">Added to Google Calendar</CardTitle>
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <CalendarPlusIcon className="size-4" />
+          </CardIcon>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-sm">Added to Google Calendar</CardTitle>
+            <CardDescription className="text-xs">{formatDate(data.date as string)}</CardDescription>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-1 text-sm">
+        <CardContent className="space-y-2 text-sm">
           <div className="font-medium">{String(data.summary)}</div>
-          <div className="text-muted-foreground text-xs">{String(data.date)}</div>
           {data.link ? (
             <a
               href={String(data.link)}
               target="_blank"
               rel="noreferrer"
-              className="text-primary text-xs underline underline-offset-2">
+              className="text-primary inline-flex text-xs underline underline-offset-2">
               Open in Calendar
             </a>
           ) : null}
@@ -179,15 +276,18 @@ export function ToolResultCard({
 
   if (name === "send_gmail") {
     return (
-      <Card>
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
-          <SendIcon className="size-4 text-emerald-600" />
-          <CardTitle className="text-sm">Email sent from Gmail</CardTitle>
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <SendIcon className="size-4" />
+          </CardIcon>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-sm">Email sent from Gmail</CardTitle>
+            <CardDescription className="truncate text-xs">To {String(data.to)}</CardDescription>
+          </div>
         </CardHeader>
         <CardContent className="text-sm">
-          <div className="text-muted-foreground">
-            To <span className="text-foreground">{String(data.to)}</span> — {String(data.subject)}
-          </div>
+          <div className="text-muted-foreground truncate">{String(data.subject)}</div>
         </CardContent>
       </Card>
     );
@@ -198,18 +298,21 @@ export function ToolResultCard({
     if (!rows.length) return <EmptyCard text="No emails found." />;
     return (
       <Card>
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center gap-2 space-y-0">
           <MailIcon className="text-primary size-4" />
           <CardTitle className="text-sm">Inbox ({rows.length})</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2.5">
+        <CardContent className="space-y-2.5 border-t pt-3">
           {rows.map((m, i) => (
-            <div key={i} className="border-b pb-2 last:border-0 last:pb-0">
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm font-medium">{String(m.subject)}</span>
+            <div key={i} className="flex items-center gap-3 border-b pb-2.5 last:border-0 last:pb-0">
+              <span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
+                <MailIcon className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{String(m.subject)}</div>
+                <div className="text-muted-foreground truncate text-xs">{String(m.from)}</div>
+                <div className="text-muted-foreground truncate text-xs">{String(m.snippet)}</div>
               </div>
-              <div className="text-muted-foreground truncate text-xs">{String(m.from)}</div>
-              <div className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{String(m.snippet)}</div>
             </div>
           ))}
         </CardContent>
@@ -221,18 +324,25 @@ export function ToolResultCard({
     const rows = (data.events ?? []) as Row[];
     if (!rows.length) return <EmptyCard text="No upcoming events." />;
     return (
-      <Card>
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
-          <CalendarIcon className="text-primary size-4" />
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <CalendarIcon className="size-4" />
+          </CardIcon>
           <CardTitle className="text-sm">Upcoming events ({rows.length})</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-2.5 border-t pt-3">
           {rows.map((e, i) => (
-            <div key={i} className="flex items-center justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate">{String(e.summary)}</span>
-              <span className="text-muted-foreground shrink-0 text-xs">
-                {String(e.start).slice(0, 16).replace("T", " ")}
-              </span>
+            <div key={i} className="flex items-center gap-3 border-b pb-2.5 last:border-0 last:pb-0">
+              <CardIcon>
+                <CalendarIcon className="size-4" />
+              </CardIcon>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{String(e.summary)}</div>
+                <div className="text-muted-foreground truncate text-xs">
+                  {String(e.start).slice(0, 16).replace("T", " ")}
+                </div>
+              </div>
             </div>
           ))}
         </CardContent>
@@ -246,28 +356,28 @@ export function ToolResultCard({
     const counts = (s.counts ?? {}) as Row;
     const filed = name === "file_gst_return" && data.filed;
     return (
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-          <div className="flex items-center gap-2">
-            <LandmarkIcon className="text-primary size-4" />
-            <CardTitle className="text-sm">
-              {filed ? "GSTR-1 filed (sandbox)" : "GST return prepared"} — {String(s.period ?? "")}
-            </CardTitle>
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <LandmarkIcon className="size-4" />
+          </CardIcon>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-sm">{filed ? "GSTR-1 filed (sandbox)" : "GST return prepared"}</CardTitle>
+            <CardDescription className="text-xs">{String(s.period ?? "")}</CardDescription>
           </div>
           {filed ? <Badge variant="default">filed</Badge> : <Badge variant="secondary">draft</Badge>}
         </CardHeader>
-        <CardContent className="space-y-1 text-sm">
-          <Row2 label="Invoices" value={`${String(counts.total ?? 0)} (B2B ${String(counts.b2b ?? 0)} · B2C ${String(counts.b2c ?? 0)})`} />
-          <Row2 label="Taxable value" value={inr(s.taxable as number)} />
-          <Row2 label="IGST" value={inr(s.igst as number)} />
-          <Row2 label="CGST" value={inr(s.cgst as number)} />
-          <Row2 label="SGST" value={inr(s.sgst as number)} />
-          <div className="flex justify-between border-t pt-1 font-medium">
-            <span>Total tax (GSTR-3B)</span>
-            <span>{inr(s.totalTax as number)}</span>
-          </div>
+        <CardContent className="space-y-2">
+          <SummaryStrip>
+            <Row2 label="Invoices" value={`${String(counts.total ?? 0)} (B2B ${String(counts.b2b ?? 0)} · B2C ${String(counts.b2c ?? 0)})`} />
+            <Row2 label="Taxable value" value={inr(s.taxable as number)} />
+            <Row2 label="IGST" value={inr(s.igst as number)} />
+            <Row2 label="CGST" value={inr(s.cgst as number)} />
+            <Row2 label="SGST" value={inr(s.sgst as number)} />
+            <TotalRow label="Total tax (GSTR-3B)" value={inr(s.totalTax as number)} />
+          </SummaryStrip>
           {!filed && (
-            <p className="text-muted-foreground pt-1 text-xs">
+            <p className="text-muted-foreground text-xs">
               GSTIN {String(data.gstin ?? "")}. Ask me to file it on the sandbox to submit.
             </p>
           )}
@@ -278,14 +388,18 @@ export function ToolResultCard({
 
   if (name === "request_gst_otp") {
     return (
-      <Card>
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
-          <KeyRoundIcon className="text-primary size-4" />
-          <CardTitle className="text-sm">GST OTP sent</CardTitle>
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <KeyRoundIcon className="size-4" />
+          </CardIcon>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-sm">GST OTP sent</CardTitle>
+            <CardDescription className="text-xs">{String(data.gstin ?? "")}</CardDescription>
+          </div>
         </CardHeader>
         <CardContent className="text-muted-foreground text-sm">
-          An OTP was sent for the sandbox GST account ({String(data.gstin ?? "")}). Tell me the OTP
-          to file the return.
+          An OTP was sent for the sandbox GST account. Tell me the OTP to file the return.
         </CardContent>
       </Card>
     );
@@ -295,19 +409,28 @@ export function ToolResultCard({
     const rows = (data.deadlines ?? []) as Row[];
     if (!rows.length) return <EmptyCard text="No upcoming deadlines." />;
     return (
-      <Card>
-        <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
-          <CalendarClockIcon className="text-primary size-4" />
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <CalendarClockIcon className="size-4" />
+          </CardIcon>
           <CardTitle className="text-sm">Upcoming deadlines ({rows.length})</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-2.5 border-t pt-3">
           {rows.map((d, i) => (
-            <div key={i} className="flex items-center justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate">{String(d.title)}</span>
-              <div className="flex shrink-0 items-center gap-2">
-                {d.amount ? <span className="text-muted-foreground text-xs">{inr(d.amount as number)}</span> : null}
-                <Badge variant={d.overdue ? "destructive" : "outline"}>{String(d.date)}</Badge>
+            <div key={i} className="flex items-center gap-3 border-b pb-2.5 last:border-0 last:pb-0">
+              <CardIcon>
+                <CalendarClockIcon className="size-4" />
+              </CardIcon>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{String(d.title)}</div>
+                {d.amount ? (
+                  <div className="text-muted-foreground text-xs tabular-nums">{inr(d.amount as number)}</div>
+                ) : null}
               </div>
+              <Badge variant={d.overdue ? "destructive" : "outline"} className="shrink-0">
+                {String(d.date)}
+              </Badge>
             </div>
           ))}
         </CardContent>
@@ -322,8 +445,11 @@ export function ToolResultCard({
     }
     const isOverdueList = name === "list_overdue_invoices";
     return (
-      <Card>
-        <CardHeader className="pb-2">
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            {isOverdueList ? <AlertTriangleIcon className="size-4" /> : <FileTextIcon className="size-4" />}
+          </CardIcon>
           <CardTitle className="text-sm">
             {isOverdueList ? "Overdue invoices" : "Invoices"} ({rows.length})
           </CardTitle>
@@ -376,17 +502,32 @@ export function ToolResultCard({
     const rows = (data.clients ?? []) as Row[];
     if (!rows.length) return <EmptyCard text="No clients yet." />;
     return (
-      <Card>
-        <CardHeader className="pb-2">
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <UsersIcon className="size-4" />
+          </CardIcon>
           <CardTitle className="text-sm">Clients ({rows.length})</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {rows.map((r) => (
-            <div key={String(r.id)} className="flex items-center justify-between text-sm">
-              <span className="font-medium">{String(r.company || r.name)}</span>
-              <span className="text-muted-foreground text-xs">{String(r.email)}</span>
-            </div>
-          ))}
+        <CardContent className="space-y-2.5 border-t pt-3">
+          {rows.map((r) => {
+            const display = String(r.company || r.name || "—");
+            return (
+              <div
+                key={String(r.id)}
+                className="flex items-center gap-3 border-b pb-2.5 last:border-0 last:pb-0">
+                <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                  {initials(display)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{display}</div>
+                  {r.email ? (
+                    <div className="text-muted-foreground truncate text-xs">{String(r.email)}</div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
     );
@@ -394,9 +535,11 @@ export function ToolResultCard({
 
   // Fallback: compact JSON.
   return (
-    <Card>
-      <CardContent className="p-3">
-        <pre className="text-muted-foreground overflow-x-auto text-xs">{JSON.stringify(result, null, 2)}</pre>
+    <Card className="py-4">
+      <CardContent>
+        <pre className="text-muted-foreground bg-muted/40 overflow-x-auto rounded-lg p-3 text-xs">
+          {JSON.stringify(result, null, 2)}
+        </pre>
       </CardContent>
     </Card>
   );
@@ -406,15 +549,39 @@ function Row2({ label, value }: { label: string; value: string }) {
   return (
     <div className="text-muted-foreground flex justify-between">
       <span>{label}</span>
-      <span className="text-foreground">{value}</span>
+      <span className="text-foreground tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+/** The standard rounded icon badge used in every card header and list row. */
+function CardIcon({ children }: { children: ReactNode }) {
+  return (
+    <span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
+      {children}
+    </span>
+  );
+}
+
+/** A muted rounded strip for label/value rows, with an emphasized final total. */
+function SummaryStrip({ children }: { children: ReactNode }) {
+  return <div className="bg-muted/40 space-y-2 rounded-lg px-3 py-3 text-sm">{children}</div>;
+}
+
+/** The emphasized total row inside a SummaryStrip. */
+function TotalRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-foreground flex items-center justify-between border-t pt-2 text-base font-semibold">
+      <span>{label}</span>
+      <span className="tabular-nums">{value}</span>
     </div>
   );
 }
 
 function EmptyCard({ text }: { text: string }) {
   return (
-    <Card>
-      <CardContent className="text-muted-foreground p-4 text-sm">{text}</CardContent>
+    <Card className="py-4">
+      <CardContent className="text-muted-foreground text-sm">{text}</CardContent>
     </Card>
   );
 }
@@ -557,31 +724,31 @@ export function ConfirmCard({
   const editableEntries = Object.keys(fields).filter((k) => EDIT_FIELDS[k]);
 
   return (
-    <div className="bg-background animate-in fade-in slide-in-from-bottom-2 w-full overflow-hidden rounded-xl border shadow-sm">
-      <div className="flex items-center gap-2.5 border-b bg-amber-50/70 px-4 py-2.5 dark:bg-amber-950/20">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400">
+    <Card className="animate-in fade-in slide-in-from-bottom-2 gap-4 py-4">
+      <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+        <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
           <AlertTriangleIcon className="size-4" />
         </span>
         <div className="min-w-0">
-          <p className="truncate text-sm leading-tight font-semibold">{title}</p>
-          <p className="text-muted-foreground text-xs">Edit the details if needed, then save.</p>
+          <CardTitle className="text-sm">{title}</CardTitle>
+          <CardDescription>Edit the details if needed, then save.</CardDescription>
         </div>
-      </div>
+      </CardHeader>
 
-      <div className="space-y-3 px-4 py-3">
+      <CardContent className="space-y-4">
         {editableEntries.length > 0 && (
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-3">
             {editableEntries.map((k) => {
               const spec = EDIT_FIELDS[k];
               return (
-                <div key={k} className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">{FIELD_LABELS[k] ?? k}</Label>
+                <div key={k} className="space-y-1.5">
+                  <Label>{FIELD_LABELS[k] ?? k}</Label>
                   {spec.type === "select" ? (
                     <select
                       value={String(fields[k] ?? "")}
                       onChange={(e) => setField(k, e.target.value)}
                       disabled={disabled}
-                      className="border-input bg-background h-8 w-full rounded-md border px-2 text-sm">
+                      className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm">
                       {spec.options?.map((o) => (
                         <option key={o} value={o}>
                           {o.toUpperCase()}
@@ -594,7 +761,7 @@ export function ConfirmCard({
                       value={String(fields[k] ?? "")}
                       onChange={(e) => setField(k, e.target.value)}
                       disabled={disabled}
-                      className="h-8 text-sm"
+                      className={spec.type === "number" ? NO_SPINNER : undefined}
                     />
                   )}
                 </div>
@@ -604,28 +771,28 @@ export function ConfirmCard({
         )}
 
         {hasItems && (
-          <div className="bg-muted/30 space-y-2 rounded-lg border p-2.5">
+          <div className="space-y-2 rounded-lg border p-3">
             <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-xs font-medium">Line items</p>
-              <Button variant="ghost" size="sm" className="h-6 gap-1 text-xs" onClick={addItem} disabled={disabled}>
-                <PlusIcon className="size-3" /> Add
+              <Label>Line items</Label>
+              <Button variant="ghost" size="sm" onClick={addItem} disabled={disabled}>
+                <PlusIcon /> Add
               </Button>
             </div>
             {items.map((it, i) => (
-              <div key={i} className="flex items-center gap-1.5">
+              <div key={i} className="flex items-center gap-2">
                 <Input
                   value={it.description ?? ""}
                   placeholder="Description"
                   onChange={(e) => setItem(i, { description: e.target.value })}
                   disabled={disabled}
-                  className="h-8 flex-1 text-sm"
+                  className="flex-1"
                 />
                 <Input
                   type="number"
                   value={String(it.quantity ?? 1)}
                   onChange={(e) => setItem(i, { quantity: Number(e.target.value) })}
                   disabled={disabled}
-                  className="h-8 w-14 text-sm"
+                  className={`w-16 ${NO_SPINNER}`}
                   title="Qty"
                 />
                 <Input
@@ -633,45 +800,49 @@ export function ConfirmCard({
                   value={String(it.unit_price ?? 0)}
                   onChange={(e) => setItem(i, { unit_price: Number(e.target.value) })}
                   disabled={disabled}
-                  className="h-8 w-20 text-sm"
+                  className={`w-24 ${NO_SPINNER}`}
                   title="Unit price"
                 />
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-8 shrink-0"
+                  className="text-muted-foreground hover:text-destructive"
                   onClick={() => removeItem(i)}
-                  disabled={disabled}>
-                  <XIcon className="size-3.5" />
+                  disabled={disabled}
+                  title="Delete item">
+                  <Trash2Icon />
                 </Button>
               </div>
             ))}
-            <div className="space-y-1 border-t pt-1.5 text-sm">
-              <div className="text-muted-foreground flex justify-between">
-                <span>Subtotal</span>
-                <span className="tabular-nums">{inr(subtotal)}</span>
-              </div>
-              <div className="text-muted-foreground flex justify-between">
-                <span>GST ({taxRate}%)</span>
-                <span className="tabular-nums">{inr(tax)}</span>
-              </div>
-              <div className="text-foreground flex justify-between font-semibold">
-                <span>Total</span>
-                <span className="tabular-nums">{inr(total)}</span>
-              </div>
+          </div>
+        )}
+
+        {hasItems && (
+          <div className="bg-muted/40 space-y-2 rounded-lg px-3 py-3 text-sm">
+            <div className="text-muted-foreground flex justify-between">
+              <span>Subtotal</span>
+              <span className="tabular-nums">{inr(subtotal)}</span>
+            </div>
+            <div className="text-muted-foreground flex justify-between">
+              <span>GST ({taxRate}%)</span>
+              <span className="tabular-nums">{inr(tax)}</span>
+            </div>
+            <div className="text-foreground flex items-center justify-between border-t pt-2 text-base font-semibold">
+              <span>Total</span>
+              <span className="tabular-nums">{inr(total)}</span>
             </div>
           </div>
         )}
-      </div>
+      </CardContent>
 
-      <div className="flex gap-2 border-t px-4 py-2.5">
-        <Button size="sm" onClick={save} disabled={disabled} className="flex-1 gap-1.5">
-          <CheckIcon className="size-4" /> Save &amp; confirm
+      <CardFooter className="justify-end gap-2 border-t pt-4">
+        <Button variant="outline" onClick={onReject} disabled={disabled}>
+          <XIcon /> Cancel
         </Button>
-        <Button size="sm" variant="outline" onClick={onReject} disabled={disabled} className="flex-1 gap-1.5">
-          <XIcon className="size-4" /> Cancel
+        <Button onClick={save} disabled={disabled}>
+          <CheckIcon /> Save &amp; confirm
         </Button>
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }

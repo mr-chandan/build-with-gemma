@@ -53,6 +53,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { InvoiceActions } from "@/components/invoice/invoice-actions";
+import type { InvoiceDoc } from "@/lib/invoice-pdf";
 
 export type Invoice = {
   id: string;
@@ -177,24 +179,39 @@ export const columns: ColumnDef<Invoice>[] = [
   {
     id: "actions",
     enableHiding: false,
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <span className="sr-only">Open menu</span>
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem>View invoice</DropdownMenuItem>
-          <DropdownMenuItem>Record payment</DropdownMenuItem>
-          <DropdownMenuItem>Copy number</DropdownMenuItem>
-          <DropdownMenuItem>Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
+    cell: ({ row }) => {
+      const r = row.original;
+      const doc: InvoiceDoc = {
+        invoiceNumber: r.invoiceNumber,
+        client: r.client,
+        type: r.type,
+        status: r.status,
+        dueDate: r.dueDate,
+        total: r.total,
+        paid: r.paid,
+        balance: r.balance,
+      };
+      return (
+        <div className="flex items-center justify-end">
+          <InvoiceActions doc={doc} compact />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>Record payment</DropdownMenuItem>
+              <DropdownMenuItem>Copy number</DropdownMenuItem>
+              <DropdownMenuItem>Delete</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      );
+    },
   },
 ];
 
