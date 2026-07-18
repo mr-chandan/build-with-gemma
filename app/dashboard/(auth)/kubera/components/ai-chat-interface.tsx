@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ArrowUpIcon, MicIcon, SquareIcon } from "lucide-react";
 import { PlusIcon } from "@radix-ui/react-icons";
@@ -45,6 +45,17 @@ export default function AIChatInterface() {
   const currentTitle = conversations.find((c) => c.id === conversationId)?.title ?? null;
 
   const voice = useVoiceInput((text) => setPrompt((p) => (p ? `${p} ${text}` : text)));
+
+  // Prefill the composer when arriving with ?prompt=… (e.g. "New invoice" from Clients),
+  // then strip the query so a refresh doesn't re-prefill.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const preset = params.get("prompt");
+    if (preset) {
+      setPrompt(preset);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   const submit = () => {
     const text = prompt;

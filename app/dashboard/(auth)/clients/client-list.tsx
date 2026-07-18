@@ -22,6 +22,8 @@ import {
   UsersIcon,
 } from "lucide-react";
 
+import Link from "next/link";
+
 import { formatDate } from "@/lib/format";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -155,24 +157,31 @@ export const columns: ColumnDef<Client>[] = [
   {
     id: "actions",
     enableHiding: false,
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <span className="sr-only">Open menu</span>
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem>View client</DropdownMenuItem>
-          <DropdownMenuItem>New invoice</DropdownMenuItem>
-          <DropdownMenuItem>Copy email</DropdownMenuItem>
-          <DropdownMenuItem>Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
+    cell: ({ row }) => {
+      const client = row.original;
+      const invoicePrompt = `Create a new invoice for ${client.name}.`;
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/kubera?prompt=${encodeURIComponent(invoicePrompt)}`}>
+                New invoice
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem>Copy email</DropdownMenuItem>
+            <DropdownMenuItem>Delete</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    },
   },
 ];
 
