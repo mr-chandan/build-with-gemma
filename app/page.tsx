@@ -53,7 +53,6 @@ export default async function LoginPage() {
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex items-center gap-2">
           <Logo />
-          <span className="text-lg font-semibold tracking-tight">Kubera.ai</span>
         </div>
 
         <div className="flex flex-1 items-center justify-center">

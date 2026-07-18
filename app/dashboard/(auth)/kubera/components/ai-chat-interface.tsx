@@ -22,6 +22,7 @@ import { useAgentChat } from "../hooks/use-agent-chat";
 import { useVoiceInput } from "../hooks/use-voice-input";
 import { ToolResultCard, ConfirmCard } from "./agent-cards";
 import ChatHistoryDialog from "./chat-history-dialog";
+import GoogleConnectedBadge from "./google-connected-badge";
 
 export default function AIChatInterface() {
   const [prompt, setPrompt] = useState("");
@@ -65,6 +66,7 @@ export default function AIChatInterface() {
           <div className="min-w-0 flex-1">
             {currentTitle && <h2 className="truncate text-sm font-semibold">{currentTitle}</h2>}
           </div>
+          <GoogleConnectedBadge />
           <ChatHistoryDialog
             conversations={conversations}
             conversationId={conversationId}
