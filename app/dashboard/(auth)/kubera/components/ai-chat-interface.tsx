@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ArrowUpIcon, MicIcon, SquareIcon } from "lucide-react";
 import { PlusIcon } from "@radix-ui/react-icons";
@@ -22,6 +22,7 @@ import { useAgentChat } from "../hooks/use-agent-chat";
 import { useVoiceInput } from "../hooks/use-voice-input";
 import { ToolResultCard, ConfirmCard } from "./agent-cards";
 import ChatHistoryDialog from "./chat-history-dialog";
+import GoogleConnectedBadge from "./google-connected-badge";
 
 export default function AIChatInterface() {
   const [prompt, setPrompt] = useState("");
@@ -45,6 +46,17 @@ export default function AIChatInterface() {
 
   const voice = useVoiceInput((text) => setPrompt((p) => (p ? `${p} ${text}` : text)));
 
+  // Prefill the composer when arriving with ?prompt=… (e.g. "New invoice" from Clients),
+  // then strip the query so a refresh doesn't re-prefill.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const preset = params.get("prompt");
+    if (preset) {
+      setPrompt(preset);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
   const submit = () => {
     const text = prompt;
     if (!text.trim() || isStreaming) return;
@@ -65,6 +77,7 @@ export default function AIChatInterface() {
           <div className="min-w-0 flex-1">
             {currentTitle && <h2 className="truncate text-sm font-semibold">{currentTitle}</h2>}
           </div>
+          <GoogleConnectedBadge />
           <ChatHistoryDialog
             conversations={conversations}
             conversationId={conversationId}

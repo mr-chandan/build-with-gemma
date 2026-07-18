@@ -85,7 +85,7 @@ export const createInvoiceTool: Tool = {
     // B2B vs B2C is derived from the client's GSTIN, not asked.
     const { data: client, error: clientErr } = await supabase
       .from("clients")
-      .select("id, gstin")
+      .select("id, name, company, email, gstin")
       .eq("id", args.client_id)
       .eq("user_id", ctx.userId)
       .single();
@@ -105,8 +105,14 @@ export const createInvoiceTool: Tool = {
 
     // Allocate a per-user number, retrying on the (rare) unique-constraint race.
     let seq = (await maxInvoiceSeq(supabase, ctx.userId)) + 1;
-    let invoice: { id: string; invoice_number: string; total: number; due_date: string; status: string } | null =
-      null;
+    let invoice: {
+      id: string;
+      invoice_number: string;
+      total: number;
+      due_date: string;
+      issue_date: string;
+      status: string;
+    } | null = null;
     for (let attempt = 0; attempt < 5 && !invoice; attempt++) {
       const { data, error } = await supabase
         .from("invoices")
@@ -123,7 +129,7 @@ export const createInvoiceTool: Tool = {
           total,
           notes: args.notes ?? null,
         })
-        .select("id, invoice_number, total, due_date, status")
+        .select("id, invoice_number, total, due_date, issue_date, status")
         .single();
       if (!error) {
         invoice = data;
@@ -140,7 +146,29 @@ export const createInvoiceTool: Tool = {
       .insert(items.map((it) => ({ ...it, invoice_id: invoice.id })));
     if (itemsError) return { error: `Invoice created but items failed: ${itemsError.message}` };
 
-    return { invoice: { ...invoice, invoice_type, subtotal, tax_amount } };
+    return {
+      invoice: {
+        ...invoice,
+        invoice_type,
+        subtotal,
+        tax_rate: args.tax_rate,
+        tax_amount,
+        notes: args.notes ?? null,
+        items: items.map((it) => ({
+          description: it.description,
+          quantity: it.quantity,
+          unit_price: it.unit_price,
+          amount: it.amount,
+        })),
+        client: {
+          id: client.id,
+          name: client.name,
+          company: client.company,
+          email: client.email,
+          gstin: client.gstin,
+        },
+      },
+    };
   },
 };
 
