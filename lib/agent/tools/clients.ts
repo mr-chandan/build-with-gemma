@@ -10,12 +10,13 @@ export const listClientsTool: Tool = {
   schema: z.object({
     search: z.string().optional().describe("Optional name/company/email substring to filter by."),
   }),
-  handler: async (input) => {
+  handler: async (input, ctx) => {
     const { search } = input as { search?: string };
     const supabase = createServiceClient();
     let query = supabase
       .from("clients")
       .select("id, name, email, company, gstin, phone")
+      .eq("user_id", ctx.userId)
       .order("created_at", { ascending: false })
       .limit(50);
     if (search) {
@@ -39,11 +40,11 @@ export const createClientTool: Tool = {
     phone: z.string().optional(),
     address: z.string().optional(),
   }),
-  handler: async (input) => {
+  handler: async (input, ctx) => {
     const supabase = createServiceClient();
     const { data, error } = await supabase
       .from("clients")
-      .insert(input as Record<string, unknown>)
+      .insert({ ...(input as Record<string, unknown>), user_id: ctx.userId })
       .select("id, name, email, company, gstin, phone")
       .single();
     if (error) return { error: error.message };

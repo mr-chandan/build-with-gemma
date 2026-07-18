@@ -17,6 +17,15 @@ export function GoogleSignInButton() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/apps/ai-chat-v2`,
+        // Gmail (read + send) and Calendar (read + write events) so Kubera can read and
+        // manage the user's mail and calendar. offline + consent returns a refresh token.
+        scopes: [
+          "https://www.googleapis.com/auth/gmail.readonly",
+          "https://www.googleapis.com/auth/gmail.send",
+          "https://www.googleapis.com/auth/calendar.events",
+          "https://www.googleapis.com/auth/calendar.readonly",
+        ].join(" "),
+        queryParams: { access_type: "offline", prompt: "consent" },
       },
     });
     if (error) {

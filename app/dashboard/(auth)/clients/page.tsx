@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { UsersIcon } from "lucide-react";
 
 import { createServiceClient } from "@/utils/supabase/service";
+import { createClient } from "@/utils/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,10 +20,16 @@ export const metadata: Metadata = { title: "Clients — Kubera.ai" };
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
+  const cookieStore = await cookies();
+  const {
+    data: { user },
+  } = await createClient(cookieStore).auth.getUser();
+
   const supabase = createServiceClient();
   const { data: clients } = await supabase
     .from("clients")
     .select("id, name, company, email, phone, gstin, created_at")
+    .eq("user_id", user?.id ?? "")
     .order("created_at", { ascending: false });
 
   const rows = clients ?? [];

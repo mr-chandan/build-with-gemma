@@ -83,6 +83,16 @@ create table if not exists cash_flow_entries (
   created_at timestamptz not null default now()
 );
 
+-- Stored Google OAuth refresh tokens (Gmail + Calendar), captured at sign-in.
+-- Single-tenant hackathon posture: RLS allow-all. Tighten before multi-tenant/production.
+create table if not exists google_credentials (
+  user_id uuid primary key,
+  refresh_token text not null,
+  scopes text,
+  email text,
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists idx_invoices_client on invoices(client_id);
 create index if not exists idx_invoices_status on invoices(status);
 create index if not exists idx_invoice_items_invoice on invoice_items(invoice_id);
@@ -109,6 +119,7 @@ alter table invoices enable row level security;
 alter table invoice_items enable row level security;
 alter table invoice_reminders enable row level security;
 alter table invoice_payments enable row level security;
+alter table google_credentials enable row level security;
 alter table cash_flow_entries enable row level security;
 
 create policy "allow all clients" on clients for all using (true) with check (true);
@@ -116,4 +127,5 @@ create policy "allow all invoices" on invoices for all using (true) with check (
 create policy "allow all invoice_items" on invoice_items for all using (true) with check (true);
 create policy "allow all invoice_reminders" on invoice_reminders for all using (true) with check (true);
 create policy "allow all invoice_payments" on invoice_payments for all using (true) with check (true);
+create policy "allow all google_credentials" on google_credentials for all using (true) with check (true);
 create policy "allow all cash_flow_entries" on cash_flow_entries for all using (true) with check (true);

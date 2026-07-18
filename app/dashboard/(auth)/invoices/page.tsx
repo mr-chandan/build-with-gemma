@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { FileTextIcon } from "lucide-react";
 
 import { createServiceClient } from "@/utils/supabase/service";
+import { createClient } from "@/utils/supabase/server";
 import { inr, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +38,12 @@ function isOverdue(status: string, due: string, paid: number, total: number): bo
 }
 
 export default async function InvoicesPage() {
+  const cookieStore = await cookies();
+  const {
+    data: { user },
+  } = await createClient(cookieStore).auth.getUser();
+  const uid = user?.id ?? "";
+
   const supabase = createServiceClient();
 
   const [{ data: invoices }, { data: payments }] = await Promise.all([
@@ -44,10 +52,12 @@ export default async function InvoicesPage() {
       .select(
         "id, invoice_number, invoice_type, status, issue_date, due_date, total, amount_paid, clients(name, company)"
       )
+      .eq("user_id", uid)
       .order("issue_date", { ascending: false }),
     supabase
       .from("invoice_payments")
       .select("id, amount, paid_on, method, reference, invoices(invoice_number)")
+      .eq("user_id", uid)
       .order("paid_on", { ascending: false })
       .limit(25),
   ]);
