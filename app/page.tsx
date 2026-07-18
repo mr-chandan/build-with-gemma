@@ -44,7 +44,7 @@ export default async function LoginPage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/kubera");
+    redirect("/dashboard/kubera");
   }
 
   return (

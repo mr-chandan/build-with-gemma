@@ -12,7 +12,7 @@ import { createServiceClient } from "@/utils/supabase/service";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/kubera";
+  const next = searchParams.get("next") ?? "/dashboard/kubera";
 
   if (code) {
     const cookieStore = await cookies();
