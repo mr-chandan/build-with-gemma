@@ -7,7 +7,7 @@ import { AppSidebar } from "@/components/layout/sidebar/app-sidebar";
 import { SiteHeader } from "@/components/layout/header";
 import { createClient } from "@/utils/supabase/server";
 
-export default async function AuthLayout({
+export default async function KuberaLayout({
   children
 }: Readonly<{
   children: React.ReactNode;

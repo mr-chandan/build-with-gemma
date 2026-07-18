@@ -16,7 +16,7 @@ export function GoogleSignInButton() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/apps/ai-chat-v2`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/kubera`,
       },
     });
     if (error) {

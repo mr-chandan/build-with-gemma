@@ -1,30 +1,13 @@
 import type { Metadata } from "next";
-import { FileTextIcon } from "lucide-react";
 
 import { createServiceClient } from "@/utils/supabase/service";
-import { inr, formatDate } from "@/lib/format";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { inr } from "@/lib/format";
+import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
+import { Card, CardDescription, CardHeader } from "@/components/ui/card";
+import InvoiceList, { Invoice } from "./invoice-list";
 
 export const metadata: Metadata = { title: "Invoices — Kubera.ai" };
 export const dynamic = "force-dynamic";
-
-const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  paid: "default",
-  sent: "secondary",
-  draft: "outline",
-  overdue: "destructive",
-  cancelled: "outline",
-};
 
 type ClientRef = { name?: string; company?: string } | null;
 function clientName(c: ClientRef): string {
@@ -35,154 +18,128 @@ function isOverdue(status: string, due: string, paid: number, total: number): bo
   return status !== "paid" && total - paid > 0 && new Date(due) < new Date();
 }
 
+/** Percentage change from `prev` to `curr`; null when there's no prior baseline. */
+function pctChange(curr: number, prev: number): number | null {
+  if (prev === 0) return null;
+  return ((curr - prev) / prev) * 100;
+}
+
 export default async function InvoicesPage() {
   const supabase = createServiceClient();
 
-  const [{ data: invoices }, { data: payments }] = await Promise.all([
-    supabase
-      .from("invoices")
-      .select(
-        "id, invoice_number, invoice_type, status, issue_date, due_date, total, amount_paid, clients(name, company)"
-      )
-      .order("issue_date", { ascending: false }),
-    supabase
-      .from("invoice_payments")
-      .select("id, amount, paid_on, method, reference, invoices(invoice_number)")
-      .order("paid_on", { ascending: false })
-      .limit(25),
-  ]);
+  const { data: invoices } = await supabase
+    .from("invoices")
+    .select(
+      "id, invoice_number, invoice_type, status, issue_date, due_date, total, amount_paid, clients(name, company)"
+    )
+    .order("issue_date", { ascending: false });
 
-  const rows = invoices ?? [];
-  const pays = payments ?? [];
+  const raw = invoices ?? [];
 
-  const totalInvoiced = rows.reduce((s, r) => s + Number(r.total), 0);
-  const totalCollected = rows.reduce((s, r) => s + Number(r.amount_paid), 0);
+  // Flatten rows for the client table, resolving overdue status.
+  const rows: Invoice[] = raw.map((r) => {
+    const paid = Number(r.amount_paid);
+    const total = Number(r.total);
+    const overdue = isOverdue(r.status, r.due_date, paid, total);
+    return {
+      id: r.id,
+      invoiceNumber: r.invoice_number,
+      client: clientName(r.clients as ClientRef),
+      type: r.invoice_type,
+      total,
+      paid,
+      balance: total - paid,
+      dueDate: r.due_date,
+      status: (overdue ? "overdue" : r.status) as Invoice["status"],
+    };
+  });
+
+  const totalInvoiced = rows.reduce((s, r) => s + r.total, 0);
+  const totalCollected = rows.reduce((s, r) => s + r.paid, 0);
   const outstanding = totalInvoiced - totalCollected;
+  const overdueAmount = rows.filter((r) => r.status === "overdue").reduce((s, r) => s + r.balance, 0);
+
+  // Month-over-month deltas based on the invoice issue date.
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
+  const inMonth = (iso: string, monthsAgo: number) => {
+    const d = new Date(iso);
+    const target = new Date(thisYear, thisMonth - monthsAgo, 1);
+    return d.getMonth() === target.getMonth() && d.getFullYear() === target.getFullYear();
+  };
+  const sumBy = (pred: (r: Invoice) => boolean, pick: (r: Invoice) => number) =>
+    rows.filter(pred).reduce((s, r) => s + pick(r), 0);
+
+  const invoicedCur = sumBy((r) => inMonth(r.dueDate, 0), (r) => r.total);
+  const invoicedPrev = sumBy((r) => inMonth(r.dueDate, 1), (r) => r.total);
+  const collectedCur = sumBy((r) => inMonth(r.dueDate, 0), (r) => r.paid);
+  const collectedPrev = sumBy((r) => inMonth(r.dueDate, 1), (r) => r.paid);
+  const outstandingCur = sumBy((r) => inMonth(r.dueDate, 0), (r) => r.balance);
+  const outstandingPrev = sumBy((r) => inMonth(r.dueDate, 1), (r) => r.balance);
+  const overdueCur = sumBy((r) => r.status === "overdue" && inMonth(r.dueDate, 0), (r) => r.balance);
+  const overduePrev = sumBy((r) => r.status === "overdue" && inMonth(r.dueDate, 1), (r) => r.balance);
+
+  const metrics = [
+    { label: "Total Invoiced", value: totalInvoiced, delta: pctChange(invoicedCur, invoicedPrev) },
+    { label: "Total Collected", value: totalCollected, delta: pctChange(collectedCur, collectedPrev) },
+    { label: "Outstanding", value: outstanding, delta: pctChange(outstandingCur, outstandingPrev), invert: true },
+    { label: "Overdue", value: overdueAmount, delta: pctChange(overdueCur, overduePrev), invert: true },
+  ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Invoices</h1>
         <p className="text-muted-foreground text-sm">B2B and B2C invoices, payments, and status.</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile label="Total invoiced" value={inr(totalInvoiced)} />
-        <StatTile label="Collected" value={inr(totalCollected)} />
-        <StatTile label="Outstanding" value={inr(outstanding)} accent />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {metrics.map((m) => (
+          <MetricCard key={m.label} {...m} />
+        ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">All invoices ({rows.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="px-0">
-          {rows.length === 0 ? (
-            <Empty className="py-10">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <FileTextIcon />
-                </EmptyMedia>
-                <EmptyTitle>No invoices yet</EmptyTitle>
-                <EmptyDescription>
-                  Ask Kubera: “Create a B2B invoice for Acme: 10 hours consulting at ₹5000, due next month”.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead>Due</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((r) => {
-                  const paid = Number(r.amount_paid);
-                  const total = Number(r.total);
-                  const overdue = isOverdue(r.status, r.due_date, paid, total);
-                  const status = overdue ? "overdue" : r.status;
-                  return (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.invoice_number}</TableCell>
-                      <TableCell>{clientName(r.clients as ClientRef)}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{r.invoice_type.toUpperCase()}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(total)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(paid)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(total - paid)}</TableCell>
-                      <TableCell className="text-muted-foreground">{formatDate(r.due_date)}</TableCell>
-                      <TableCell>
-                        <Badge variant={STATUS_VARIANT[status] ?? "secondary"}>{status}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent payments ({pays.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="px-0">
-          {pays.length === 0 ? (
-            <p className="text-muted-foreground px-6 py-4 text-sm">
-              No payments recorded yet. Ask Kubera to “record a payment of ₹X for INV-0001”.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pays.map((p) => {
-                  const invRef = p.invoices as { invoice_number?: string } | null;
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell className="text-muted-foreground">{formatDate(p.paid_on)}</TableCell>
-                      <TableCell className="font-medium">{invRef?.invoice_number ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{p.method || "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{p.reference || "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{inr(p.amount)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <InvoiceList data={rows} />
     </div>
   );
 }
 
-function StatTile({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+/** Sales-style KPI card: label, big value, and a month-over-month delta line. */
+function MetricCard({
+  label,
+  value,
+  delta,
+  invert,
+}: {
+  label: string;
+  value: number;
+  delta: number | null;
+  invert?: boolean;
+}) {
+  // For "cost" metrics (outstanding/overdue) a rise is bad, so invert the color meaning.
+  const good = delta === null ? true : invert ? delta <= 0 : delta >= 0;
+  const up = (delta ?? 0) >= 0;
+  const Arrow = up ? ArrowUpIcon : ArrowDownIcon;
+  const color = good ? "text-green-500" : "text-red-500";
+
   return (
     <Card>
-      <CardContent className="p-4">
-        <p className="text-muted-foreground text-xs">{label}</p>
-        <p className={`mt-1 text-2xl font-semibold tabular-nums ${accent ? "text-primary" : ""}`}>
-          {value}
-        </p>
-      </CardContent>
+      <CardHeader className="space-y-1">
+        <CardDescription>{label}</CardDescription>
+        <div className="font-display text-2xl lg:text-3xl">{inr(value)}</div>
+        <div className="flex items-center text-xs">
+          {delta === null ? (
+            <span className="text-muted-foreground">No prior month to compare</span>
+          ) : (
+            <>
+              <Arrow className={`mr-1 size-3 ${color}`} />
+              <span className={`font-medium ${color}`}>{Math.abs(delta).toFixed(1)}%</span>
+              <span className="text-muted-foreground ml-1">Compare from last month</span>
+            </>
+          )}
+        </div>
+      </CardHeader>
     </Card>
   );
 }

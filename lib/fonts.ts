@@ -11,7 +11,25 @@ import {
   Kumbh_Sans,
   Outfit
 } from "next/font/google";
+import localFont from "next/font/local";
 import { cn } from "@/lib/utils";
+
+const satoshi = localFont({
+  variable: "--font-satoshi",
+  display: "swap",
+  src: [
+    {
+      path: "../fonts/satoshi/Satoshi-Variable.woff2",
+      weight: "300 900",
+      style: "normal"
+    },
+    {
+      path: "../fonts/satoshi/Satoshi-VariableItalic.woff2",
+      weight: "300 900",
+      style: "italic"
+    }
+  ]
+});
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -72,6 +90,7 @@ const outfit = Outfit({
 });
 
 export const fontVariables = cn(
+  satoshi.variable,
   geist.variable,
   inter.variable,
   roboto.variable,

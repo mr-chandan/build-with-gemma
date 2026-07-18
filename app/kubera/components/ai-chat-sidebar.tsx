@@ -85,7 +85,7 @@ const SidebarContent = () => {
               {group.conversations.map((conversation) => (
                 <div className="group flex items-center" key={conversation.id}>
                   <Link
-                    href={`/dashboard/apps/ai-chat-v2/${conversation.id}`}
+                    href={`/kubera/${conversation.id}`}
                     className={cn(
                       "hover:bg-muted block w-full min-w-0 justify-start truncate rounded-lg p-2 px-3 text-start text-sm",
                       params.id === conversation.id && "bg-muted"
@@ -142,7 +142,7 @@ const SidebarContent = () => {
 
         <div className="border-t p-4">
           <Button className="w-full" asChild>
-            <Link href="/dashboard/apps/ai-chat-v2">
+            <Link href="/kubera">
               <Plus />
               New Chat
             </Link>

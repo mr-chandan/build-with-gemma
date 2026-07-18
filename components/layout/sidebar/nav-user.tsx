@@ -59,6 +59,12 @@ export function NavUser() {
     });
   }, []);
 
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.assign("/");
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -96,16 +102,15 @@ export function NavUser() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <form action="/auth/signout" method="post">
-              <button type="submit" className="w-full">
-                <DropdownMenuItem asChild>
-                  <span className="flex w-full cursor-pointer items-center gap-2">
-                    <LogOutIcon className="size-4" />
-                    Log out
-                  </span>
-                </DropdownMenuItem>
-              </button>
-            </form>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                handleSignOut();
+              }}
+              className="cursor-pointer">
+              <LogOutIcon className="size-4" />
+              Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

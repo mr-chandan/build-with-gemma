@@ -1,6 +1,6 @@
 body {
     @apply overscroll-none bg-transparent antialiased;
-    --text-family: var(--font-outfit), sans-serif;
+    --text-family: var(--font-satoshi), sans-serif;
 }
 
 /* Theme presets */

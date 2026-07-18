@@ -10,7 +10,7 @@ import { createClient } from "@/utils/supabase/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard/apps/ai-chat-v2";
+  const next = searchParams.get("next") ?? "/kubera";
 
   if (code) {
     const cookieStore = await cookies();
@@ -21,5 +21,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  return NextResponse.redirect(`${origin}/?error=auth`);
 }
