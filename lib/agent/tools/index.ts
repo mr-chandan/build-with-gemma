@@ -14,6 +14,7 @@ import {
   listOverdueInvoicesTool,
 } from "./invoices";
 import { sendInvoiceReminderTool } from "./reminders";
+import { getCashFlowSummaryTool } from "./cashflow";
 import { listDeadlinesTool } from "./deadlines";
 import {
   createCalendarEventTool,
@@ -39,6 +40,7 @@ export const TOOLS: AnyTool[] = [
   recordPaymentTool,
   listOverdueInvoicesTool,
   sendInvoiceReminderTool,
+  getCashFlowSummaryTool,
   listDeadlinesTool,
   createCalendarEventTool,
   sendGmailTool,
