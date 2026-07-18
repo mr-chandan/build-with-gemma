@@ -20,6 +20,7 @@ import {
   KeyRoundIcon,
   Trash2Icon,
   UsersIcon,
+  WalletIcon,
 } from "lucide-react";
 
 import {
@@ -611,6 +612,46 @@ export function ToolResultCard({
               </div>
             );
           })}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (name === "get_cash_flow_summary") {
+    if (!data.has_data) {
+      return (
+        <EmptyCard text="No cash-flow history yet. Record an invoice payment or log an expense to get started." />
+      );
+    }
+    const tm = (data.this_month ?? {}) as Row;
+    const avgNet = Number(data.avg_monthly_net ?? 0);
+    const healthy = avgNet >= 0;
+    const runway = data.runway_months;
+    return (
+      <Card className="gap-4 py-4">
+        <CardHeader className="flex flex-row items-center gap-2.5 space-y-0">
+          <CardIcon>
+            <WalletIcon className="size-4" />
+          </CardIcon>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-sm">Cash flow &amp; liquidity</CardTitle>
+            <CardDescription className="text-xs">
+              Net position {inr(data.net_position as number)}
+            </CardDescription>
+          </div>
+          <Badge variant={healthy ? "default" : "destructive"}>
+            {healthy ? "surplus" : "burning"}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <SummaryStrip>
+            <Row2 label="This month (net)" value={inr(tm.net as number)} />
+            <Row2 label="Avg monthly inflow" value={inr(data.avg_monthly_inflow as number)} />
+            <Row2 label="Avg monthly outflow" value={inr(data.avg_monthly_outflow as number)} />
+            <Row2 label="Avg monthly net" value={inr(data.avg_monthly_net as number)} />
+            <Row2 label="Outstanding receivables" value={inr(data.outstanding_receivables as number)} />
+            <TotalRow label="Runway" value={runway == null ? "—" : `${String(runway)} mo`} />
+          </SummaryStrip>
         </CardContent>
       </Card>
     );
