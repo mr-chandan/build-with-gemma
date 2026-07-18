@@ -5,15 +5,22 @@ import type { Tool } from "../types";
 
 type SupabaseClient = ReturnType<typeof createServiceClient>;
 
-/** Next sequential invoice number for this user, e.g. INV-0001. */
-async function nextInvoiceNumber(supabase: SupabaseClient, userId: string): Promise<string> {
-  const { count } = await supabase
+/** Highest invoice number this user has used, so the next one never collides even
+ *  after deletions. Returns 0 when the user has no invoices. */
+async function maxInvoiceSeq(supabase: SupabaseClient, userId: string): Promise<number> {
+  const { data } = await supabase
     .from("invoices")
-    .select("id", { count: "exact", head: true })
+    .select("invoice_number")
     .eq("user_id", userId);
-  const n = (count ?? 0) + 1;
-  return `INV-${String(n).padStart(4, "0")}`;
+  let max = 0;
+  for (const row of data ?? []) {
+    const m = /(\d+)$/.exec(row.invoice_number ?? "");
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return max;
 }
+
+const fmtInvoiceNumber = (n: number) => `INV-${String(n).padStart(4, "0")}`;
 
 const itemSchema = z.object({
   description: z.string(),
@@ -56,11 +63,10 @@ export const listInvoicesTool: Tool = {
 export const createInvoiceTool: Tool = {
   name: "create_invoice",
   description:
-    "Create an invoice for a client with one or more line items. invoice_type is 'b2b' (business, has GSTIN) or 'b2c' (consumer). tax_rate is a GST percentage (default 18). The invoice is marked 'sent'.",
+    "Create an invoice for a client with one or more line items. B2B vs B2C is decided automatically from whether the client has a GSTIN — do NOT ask the user. tax_rate is a GST percentage (default 18). The invoice is marked 'sent'.",
   requiresConfirmation: true,
   schema: z.object({
     client_id: z.string().uuid().describe("The client's id (from list_clients/create_client)."),
-    invoice_type: z.enum(["b2b", "b2c"]).default("b2b"),
     items: z.array(itemSchema).min(1).describe("Line items."),
     tax_rate: z.number().min(0).max(28).default(18).describe("GST percent."),
     due_date: z.string().describe("ISO date (YYYY-MM-DD) the payment is due."),
@@ -69,13 +75,22 @@ export const createInvoiceTool: Tool = {
   handler: async (input, ctx) => {
     const args = input as {
       client_id: string;
-      invoice_type: "b2b" | "b2c";
       items: { description: string; quantity: number; unit_price: number }[];
       tax_rate: number;
       due_date: string;
       notes?: string;
     };
     const supabase = createServiceClient();
+
+    // B2B vs B2C is derived from the client's GSTIN, not asked.
+    const { data: client, error: clientErr } = await supabase
+      .from("clients")
+      .select("id, gstin")
+      .eq("id", args.client_id)
+      .eq("user_id", ctx.userId)
+      .single();
+    if (clientErr || !client) return { error: "Client not found." };
+    const invoice_type = client.gstin ? "b2b" : "b2c";
 
     const items = args.items.map((it, i) => ({
       description: it.description,
@@ -87,33 +102,45 @@ export const createInvoiceTool: Tool = {
     const subtotal = Number(items.reduce((s, it) => s + it.amount, 0).toFixed(2));
     const tax_amount = Number((subtotal * (args.tax_rate / 100)).toFixed(2));
     const total = Number((subtotal + tax_amount).toFixed(2));
-    const invoice_number = await nextInvoiceNumber(supabase, ctx.userId);
 
-    const { data: invoice, error } = await supabase
-      .from("invoices")
-      .insert({
-        invoice_number,
-        client_id: args.client_id,
-        user_id: ctx.userId,
-        invoice_type: args.invoice_type,
-        status: "sent",
-        due_date: args.due_date,
-        subtotal,
-        tax_rate: args.tax_rate,
-        tax_amount,
-        total,
-        notes: args.notes ?? null,
-      })
-      .select("id, invoice_number, total, due_date, status")
-      .single();
-    if (error) return { error: error.message };
+    // Allocate a per-user number, retrying on the (rare) unique-constraint race.
+    let seq = (await maxInvoiceSeq(supabase, ctx.userId)) + 1;
+    let invoice: { id: string; invoice_number: string; total: number; due_date: string; status: string } | null =
+      null;
+    for (let attempt = 0; attempt < 5 && !invoice; attempt++) {
+      const { data, error } = await supabase
+        .from("invoices")
+        .insert({
+          invoice_number: fmtInvoiceNumber(seq),
+          client_id: args.client_id,
+          user_id: ctx.userId,
+          invoice_type,
+          status: "sent",
+          due_date: args.due_date,
+          subtotal,
+          tax_rate: args.tax_rate,
+          tax_amount,
+          total,
+          notes: args.notes ?? null,
+        })
+        .select("id, invoice_number, total, due_date, status")
+        .single();
+      if (!error) {
+        invoice = data;
+      } else if (error.code === "23505") {
+        seq += 1; // number taken — bump and retry
+      } else {
+        return { error: error.message };
+      }
+    }
+    if (!invoice) return { error: "Could not allocate an invoice number, please try again." };
 
     const { error: itemsError } = await supabase
       .from("invoice_items")
       .insert(items.map((it) => ({ ...it, invoice_id: invoice.id })));
     if (itemsError) return { error: `Invoice created but items failed: ${itemsError.message}` };
 
-    return { invoice: { ...invoice, subtotal, tax_amount } };
+    return { invoice: { ...invoice, invoice_type, subtotal, tax_amount } };
   },
 };
 

@@ -4,7 +4,9 @@ import { ChevronRightIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import type { Metrics } from "./gemma-dashboard";
 
 type Urgency = "high" | "medium" | "low";
 
@@ -14,49 +16,32 @@ const badgeVariant: Record<Urgency, "destructive" | "warning" | "success"> = {
   low: "success"
 };
 
-const decisions: {
-  id: string;
-  title: string;
-  impact: string;
-  urgency: Urgency;
-  prompt: string;
-}[] = [
-  {
-    id: "overdue",
-    title: "Escalate 2 invoices past 60 days",
-    impact: "+₹18.0L",
-    urgency: "high",
-    prompt: "Draft a follow-up for my invoices that are more than 60 days overdue."
-  },
-  {
-    id: "advance-tax",
-    title: "Set aside advance tax due 15 Sep",
-    impact: "−₹5.4L",
-    urgency: "high",
-    prompt: "How much advance tax should I set aside for the September instalment?"
-  },
-  {
-    id: "vendor-terms",
-    title: "Move top vendors to net-45 terms",
-    impact: "+₹3.2L",
-    urgency: "medium",
-    prompt: "Which vendors should I move to net-45 payment terms?"
-  },
-  {
-    id: "idle-cash",
-    title: "Sweep idle cash into a liquid fund",
-    impact: "+₹96K",
-    urgency: "low",
-    prompt: "How much idle cash can I safely sweep into a liquid fund?"
-  }
-];
-
 export function ActionableDecisionsCard({
+  metrics,
   onAskGemma
 }: {
+  metrics: Metrics | null;
   /** Seeds the question into the chat composer. */
   onAskGemma?: (message: string) => void;
 }) {
+  const decisions = metrics?.decisions ?? [];
+
+  if (!metrics) {
+    return (
+      <Card className="gap-3 py-4">
+        <CardHeader className="px-4">
+          <CardTitle className="text-sm">Actionable Decisions</CardTitle>
+          <CardDescription className="text-xs">Ranked by cash impact</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-1.5 px-4">
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="gap-3 py-4">
       <CardHeader className="px-4">
@@ -66,6 +51,11 @@ export function ActionableDecisionsCard({
       {/* Caps at ~3 rows so this card stops dictating the height of the whole
           grid row; anything beyond that scrolls inside the card. */}
       <CardContent className="max-h-[156px] space-y-1.5 overflow-y-auto px-4">
+        {decisions.length === 0 && (
+          <p className="text-muted-foreground py-4 text-center text-xs">
+            Nothing urgent right now. Add invoices to see recommendations.
+          </p>
+        )}
         {decisions.map((decision) => (
           <button
             key={decision.id}

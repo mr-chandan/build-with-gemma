@@ -6,11 +6,14 @@ import {
   listCalendarEvents,
   listGmailMessages,
   GoogleNotConnectedError,
+  GoogleScopeError,
 } from "@/lib/google/client";
 import type { Tool } from "../types";
 
 function googleError(err: unknown): { error: string } {
-  if (err instanceof GoogleNotConnectedError) return { error: err.message };
+  if (err instanceof GoogleNotConnectedError || err instanceof GoogleScopeError) {
+    return { error: err.message };
+  }
   return { error: err instanceof Error ? err.message : "Google request failed" };
 }
 

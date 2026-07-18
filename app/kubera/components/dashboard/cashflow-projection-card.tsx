@@ -1,6 +1,5 @@
 "use client";
 
-import { TrendingUpIcon } from "lucide-react";
 import { Bar, BarChart, XAxis } from "recharts";
 
 import {
@@ -17,52 +16,47 @@ import {
   ChartTooltip,
   ChartTooltipContent
 } from "@/components/ui/chart";
-
-const chartData = [
-  { month: "August", projected: 22.5 },
-  { month: "September", projected: 18.6 },
-  { month: "October", projected: 26.8 },
-  { month: "November", projected: 21.4 },
-  { month: "December", projected: 28.2 },
-  { month: "January", projected: 24.1 }
-];
+import { Skeleton } from "@/components/ui/skeleton";
+import { inr } from "@/lib/format";
+import type { Metrics } from "./gemma-dashboard";
 
 const chartConfig = {
   projected: {
-    label: "Projected (₹L)",
+    label: "Expected inflow",
     color: "var(--chart-1)"
   }
 } satisfies ChartConfig;
 
-export function CashflowProjectionCard() {
+export function CashflowProjectionCard({ metrics }: { metrics: Metrics | null }) {
+  const chartData = metrics?.projection ?? [];
+  const totalExpected = chartData.reduce((s, d) => s + d.projected, 0);
+
   return (
     <Card className="gap-3 py-4">
       <CardHeader className="px-4">
         <CardTitle className="text-sm">Cashflow Projection</CardTitle>
-        <CardDescription className="text-xs">Next 6 months</CardDescription>
+        <CardDescription className="text-xs">Expected inflow, next 6 months</CardDescription>
       </CardHeader>
       <CardContent className="px-4">
-        <ChartContainer config={chartConfig} className="h-[130px] w-full">
-          <BarChart accessibilityLayer data={chartData}>
-            <XAxis
-              dataKey="month"
-              tickLine={false}
-              tickMargin={10}
-              axisLine={false}
-              tickFormatter={(value) => value.slice(0, 3)}
-            />
-            <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-            <Bar dataKey="projected" fill="var(--color-projected)" radius={10} />
-          </BarChart>
-        </ChartContainer>
+        {!metrics ? (
+          <Skeleton className="h-[130px] w-full" />
+        ) : (
+          <ChartContainer config={chartConfig} className="h-[130px] w-full">
+            <BarChart accessibilityLayer data={chartData}>
+              <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
+              <ChartTooltip
+                content={<ChartTooltipContent hideLabel formatter={(v) => inr(Number(v))} />}
+              />
+              <Bar dataKey="projected" fill="var(--color-projected)" radius={10} />
+            </BarChart>
+          </ChartContainer>
+        )}
       </CardContent>
       <CardFooter className="flex-col items-start gap-1.5 px-4 text-xs">
         <div className="flex gap-2 leading-none font-medium">
-          Up 8.4% next quarter <TrendingUpIcon className="size-3.5 text-green-600" />
+          {metrics ? `${inr(totalExpected)} expected` : "—"}
         </div>
-        <div className="text-muted-foreground leading-none">
-          From invoices, retainers &amp; recurring
-        </div>
+        <div className="text-muted-foreground leading-none">From unpaid invoices by due date</div>
       </CardFooter>
     </Card>
   );

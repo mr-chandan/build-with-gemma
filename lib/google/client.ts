@@ -12,6 +12,25 @@ export class GoogleNotConnectedError extends Error {
   }
 }
 
+export class GoogleScopeError extends Error {
+  constructor() {
+    super(
+      "Kubera has a Google connection but not the permission this needs. Please sign out and sign in again, and approve ALL the Google permissions Kubera requests (including reading your Gmail and Calendar)."
+    );
+    this.name = "GoogleScopeError";
+  }
+}
+
+/** Throw a friendly error for a failed Google API response (403 → reconnect prompt). */
+async function assertOk(res: Response, label: string): Promise<void> {
+  if (res.ok) return;
+  const body = await res.text().catch(() => "");
+  if (res.status === 403 && /insufficient|scope|permission/i.test(body)) {
+    throw new GoogleScopeError();
+  }
+  throw new Error(`${label} (${res.status}): ${body.slice(0, 200)}`);
+}
+
 async function getRefreshToken(userId: string): Promise<string> {
   const { data } = await createServiceClient()
     .from("google_credentials")
@@ -68,10 +87,7 @@ export async function insertCalendarEvent(
       body: JSON.stringify(body),
     }
   );
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`Calendar insert failed (${res.status}): ${t.slice(0, 200)}`);
-  }
+  await assertOk(res, "Calendar insert failed");
   const json = (await res.json()) as { id: string; htmlLink: string };
   return { id: json.id, htmlLink: json.htmlLink };
 }
@@ -92,10 +108,7 @@ export async function listCalendarEvents(
     `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`Calendar list failed (${res.status}): ${t.slice(0, 200)}`);
-  }
+  await assertOk(res, "Calendar list failed");
   const json = (await res.json()) as {
     items?: { id: string; summary?: string; start?: { date?: string; dateTime?: string }; htmlLink?: string }[];
   };
@@ -119,10 +132,7 @@ export async function listGmailMessages(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?${listParams}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!listRes.ok) {
-    const t = await listRes.text().catch(() => "");
-    throw new Error(`Gmail list failed (${listRes.status}): ${t.slice(0, 200)}`);
-  }
+  await assertOk(listRes, "Gmail list failed");
   const list = (await listRes.json()) as { messages?: { id: string }[] };
   const ids = (list.messages ?? []).map((m) => m.id);
 
@@ -172,10 +182,7 @@ export async function sendGmailMessage(
       body: JSON.stringify({ raw }),
     }
   );
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`Gmail send failed (${res.status}): ${t.slice(0, 200)}`);
-  }
+  await assertOk(res, "Gmail send failed");
   const json = (await res.json()) as { id: string };
   return { id: json.id };
 }

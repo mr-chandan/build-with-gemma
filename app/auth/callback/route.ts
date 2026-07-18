@@ -46,7 +46,7 @@ export async function GET(request: Request) {
             .upsert({
               user_id: data.user.id,
               refresh_token: refreshToken,
-              scopes: "gmail.send calendar.events",
+              scopes: "gmail.readonly gmail.send calendar.readonly calendar.events",
               email: data.user.email ?? null,
               updated_at: new Date().toISOString(),
             });
