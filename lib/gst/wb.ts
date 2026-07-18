@@ -7,14 +7,17 @@
  * the session token as both `txn` and `auth-token`.
  */
 
-const ENV = process.env.WHITEBOOKS_ENV ?? "sandbox";
-
 function cfg() {
-  const suffix = ENV === "production" ? "_PROD" : "_SANDBOX";
+  // Read env freshly each call (survives dev env reloads). Accept prod/production/live.
+  const env = (process.env.WHITEBOOKS_ENV ?? "sandbox").toLowerCase();
+  const isProd = env === "prod" || env === "production" || env === "live";
+  const suffix = isProd ? "_PROD" : "_SANDBOX";
+  const pick = (base: string) =>
+    process.env[`${base}${suffix}`] ?? process.env[base] ?? "";
   return {
-    baseUrl: (process.env[`WHITEBOOKS_BASE_URL${suffix}`] ?? "").replace(/\/$/, ""),
-    clientId: process.env[`WHITEBOOKS_CLIENT_ID${suffix}`] ?? "",
-    clientSecret: process.env[`WHITEBOOKS_CLIENT_SECRET${suffix}`] ?? "",
+    baseUrl: pick("WHITEBOOKS_BASE_URL").replace(/\/$/, ""),
+    clientId: pick("WHITEBOOKS_CLIENT_ID"),
+    clientSecret: pick("WHITEBOOKS_CLIENT_SECRET"),
     ip: process.env.WHITEBOOKS_IP ?? "127.0.0.1",
     email: process.env.WHITEBOOKS_REGISTERED_EMAIL ?? "",
   };

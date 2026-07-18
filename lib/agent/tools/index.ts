@@ -21,7 +21,14 @@ import {
   listCalendarEventsTool,
   listGmailTool,
 } from "./google";
-import { prepareGstReturnTool, requestGstOtpTool, fileGstReturnTool } from "./gst";
+import {
+  setGstProfileTool,
+  getGstDetailsTool,
+  getGstReturnStatusTool,
+  prepareGstReturnTool,
+  requestGstOtpTool,
+  fileGstReturnTool,
+} from "./gst";
 
 export const TOOLS: AnyTool[] = [
   pingTool,
@@ -37,6 +44,9 @@ export const TOOLS: AnyTool[] = [
   sendGmailTool,
   listCalendarEventsTool,
   listGmailTool,
+  setGstProfileTool,
+  getGstDetailsTool,
+  getGstReturnStatusTool,
   prepareGstReturnTool,
   requestGstOtpTool,
   fileGstReturnTool,
