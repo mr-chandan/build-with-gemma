@@ -24,6 +24,17 @@ import { ToolResultCard, ConfirmCard } from "./agent-cards";
 import ChatHistoryDialog from "./chat-history-dialog";
 import GoogleConnectedBadge from "./google-connected-badge";
 
+/** Quick-start prompts shown as chips under the composer; clicking sends immediately. */
+const SUGGESTIONS = [
+  "Fetch my invoice data",
+  "Create an invoice",
+  "Show my overdue invoices",
+  "Forecast my cash flow",
+  "Any liquidity risks?",
+  "List my clients",
+  "Summarize this month",
+];
+
 export default function AIChatInterface() {
   const [prompt, setPrompt] = useState("");
   const {
@@ -67,6 +78,12 @@ export default function AIChatInterface() {
   const handleNewChat = () => {
     newChat();
     setPrompt("");
+  };
+
+  const sendSuggestion = (text: string) => {
+    if (isStreaming) return;
+    setPrompt("");
+    void send(text);
   };
 
   return (
@@ -186,6 +203,19 @@ export default function AIChatInterface() {
       {/* COMPOSER — pinned. */}
       <div className="shrink-0">
         <div className="mx-auto w-full max-w-4xl px-4 py-3">
+          {/* Quick-start suggestion chips — click to send. */}
+          <div className="mb-2 flex flex-wrap gap-2">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => sendSuggestion(s)}
+                disabled={isStreaming}
+                className="border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground rounded-full border px-3 py-1.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-50">
+                {s}
+              </button>
+            ))}
+          </div>
           <Input
             value={prompt}
             onValueChange={setPrompt}
